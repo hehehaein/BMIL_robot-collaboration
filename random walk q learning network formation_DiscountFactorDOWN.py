@@ -156,7 +156,7 @@ class NodeEnv:
 class QlearningNode:
     def __init__(self, action_space, q_table):
         self.learningrate = 1e-3
-        self.discount_factor = 0.9
+        self.discount_factor = 0.4
         self.action_space = action_space
         self.num_action = len(self.action_space)
 
@@ -251,9 +251,9 @@ if __name__ == '__main__':
     # trace method
     epi_reward = 0
     last_reward = 0
-    reward = [] # 각 노드별 reward
+    reward = []
     epi_through = 0
-    throughput_trace = [] #
+    throughput_trace = []
     reward_trace = []
     txr_step = np.zeros([num_step, max_node - 2])  # 스텝별 tx range 모두 저장
     txr_node = np.zeros([num_episodes, max_node - 2])  # episode의 평균 tx range
@@ -268,7 +268,6 @@ if __name__ == '__main__':
 
     for epi in range(num_episodes):
 
-        #초기화
         state, cur_txr, cur_node_loc, ori_node_loc, last_throughput = env.reset()
         cur_node_loc = np.array(cur_node_loc)
         ori_node_loc = np.array(ori_node_loc)
@@ -277,35 +276,32 @@ if __name__ == '__main__':
         eps = max(eps_end, eps_start - (eps_decay * epi))
         eps_trace.append(eps)
 
-
-        # trace method......? txr_step이 뭐지?
-        reward_trace.append(epi_reward / num_step) #이전 episode의 reward평균 저장
-        throughput_trace.append(epi_through / num_step) #이전 episode의 throughput평균 저장
-        txr_node[epi, :] = np.round(txr_step.sum(axis=0) / num_step) # episode의 평균 tx range
+        # trace method
+        reward_trace.append(epi_reward / num_step)
+        throughput_trace.append(epi_through / num_step)
+        txr_node[epi, :] = np.round(txr_step.sum(axis=0) / num_step)
         txr_step = np.zeros([num_episodes, max_node - 2])
         epi_reward = 0
         epi_through = 0
 
         for step in range(num_step):
             # initializing
-            action_idx = np.zeros([max_node - 2]) # 몇번째 action을 수행할지
-            next_txr = np.zeros([max_node - 2]) # action 수행시 바뀌는 transmition range의 index
-            action = np.zeros([max_node - 2]) # 수행할 action
+            action_idx = np.zeros([max_node - 2])
+            next_txr = np.zeros([max_node - 2])
+            action = np.zeros([max_node - 2])
 
             # epsilon greedy policy에 의해 action select
             for i in range(max_node - 2):
-                # action[i]:i번째 노드가 바뀌는 transmition range의 값.
-                # #action_idx[i]:i번째 노드가 바뀔 transmition range의 인덱스
-                action[i], action_idx[i], next_txr[i] = node[i].getAction(state[i], eps, cur_txr[i]) #eps greedy 사용해서 action 고르기
+                action[i], action_idx[i], next_txr[i] = node[i].getAction(state[i], eps, cur_txr[i])
 
-            next_state, reward, goodput = env.takeStep(action, next_txr, last_throughput, cur_node_loc) #action 수행 후, reward 저장
+            next_state, reward, goodput = env.takeStep(action, next_txr, last_throughput, cur_node_loc)
 
             # source, destination은 state 개념 없으므로 삭제
             next_state = np.delete(next_state, max_node - 1)
             next_state = np.delete(next_state, 0)
 
             for i in range(max_node - 2):
-                node[i].learn(epi, state[i], action[i], reward[i], next_state[i]) # Q-value 찾아서 Q-table에 저장
+                node[i].learn(epi, state[i], action[i], reward[i], next_state[i])
                 next_loc[i] = node[i].RandomWalk(ori_node_loc[i], cur_node_loc[i])  # random walk model
 
             state = next_state
@@ -365,12 +361,69 @@ if __name__ == '__main__':
     plt.ylabel('Throughput')
     plt.plot(throughput_trace_sum)
 
-    plt.figure()
-    plt.xlabel('episode')
-    plt.ylabel('tx range')
-    plt.title('transmission range')
-    for i in range(max_node - 2):
-        plt.plot(txr_node[1:, i], label='%s node' % i)
-        plt.legend()
-
+    plt.xlabel('agents')
+    plt.ylabel('Episodes')
+    a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t = np.vsplit(txr_node, 20)
+    a_sum = a.mean(axis=0)
+    b_sum = b.mean(axis=0)
+    c_sum = c.mean(axis=0)
+    d_sum = d.mean(axis=0)
+    e_sum = e.mean(axis=0)
+    f_sum = f.mean(axis=0)
+    g_sum = g.mean(axis=0)
+    h_sum = h.mean(axis=0)
+    i_sum = i.mean(axis=0)
+    j_sum = j.mean(axis=0)
+    k_sum = k.mean(axis=0)
+    l_sum = l.mean(axis=0)
+    m_sum = m.mean(axis=0)
+    n_sum = n.mean(axis=0)
+    o_sum = o.mean(axis=0)
+    p_sum = p.mean(axis=0)
+    q_sum = q.mean(axis=0)
+    r_sum = r.mean(axis=0)
+    s_sum = s.mean(axis=0)
+    t_sum = t.mean(axis=0)
+    # print(a_sum)
+    z_1 = np.vstack((a_sum, b_sum))
+    z_2 = np.vstack((z_1, c_sum))
+    z_3 = np.vstack((z_2, d_sum))
+    z_4 = np.vstack((z_3, e_sum))
+    z_5 = np.vstack((z_4, f_sum))
+    z_6 = np.vstack((z_5, g_sum))
+    z_7 = np.vstack((z_6, h_sum))
+    z_8 = np.vstack((z_7, i_sum))
+    z_9 = np.vstack((z_8, j_sum))
+    z_10 = np.vstack((z_9, k_sum))
+    z_11 = np.vstack((z_10, l_sum))
+    z_12 = np.vstack((z_11, m_sum))
+    z_13 = np.vstack((z_12, n_sum))
+    z_14 = np.vstack((z_13, o_sum))
+    z_15 = np.vstack((z_14, p_sum))
+    z_16 = np.vstack((z_15, q_sum))
+    z_17 = np.vstack((z_16, r_sum))
+    z_18 = np.vstack((z_17, s_sum))
+    z = np.vstack((z_18, t_sum))
+    # print(z[:,20:41])
+    # print(z)
+    """x = np.arange(0, 23, 1)
+    y = np.arange(0, 20, 0.5)
+    plt.imshow(z, vmin=0, vmax = 3)
+    plt.colorbar()
+    plt.xlim([0,22])
+    plt.ylim([0,19])
+    plt.grid(True)
+    plt.xticks(x)
+    plt.yticks(y)
+    #plt.title("3x3 random walk")
+    plt.show()"""
+    x = np.arange(0, 7, 1) #23->14
+    y = np.arange(0, 20, 0.5)
+    plt.imshow(z[:, 0:20], vmin=0, vmax=2) #vmax 8->2
+    plt.colorbar()
+    plt.xlim([0, 7]) #19->14
+    plt.ylim([0, 20]) #19->20
+    plt.grid(True)
+    plt.xticks(x)
+    plt.yticks(y)
     plt.show()

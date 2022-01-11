@@ -22,14 +22,14 @@ basic setup
 - moving angle ~ U(0, 360)
 """
 
-max_node = 9  # basic setup : 전체 노드 수를 미리 선언해야 계산 용이
+max_node = 16  # basic setup : 전체 노드 수를 미리 선언해야 계산 용이
 
 
 # 전체 environment
 class NodeEnv:
     def __init__(self, txr_level, txr_interval):
         # envorionment matrix에 해당하는 변수 선언
-        self.net_dim = 3
+        self.net_dim = 4
         self.one_dim = 1
         self.max_dim = self.net_dim * self.one_dim
         self.net_block = self.net_dim ** 2  # 정사각형 environment 가정
@@ -117,7 +117,7 @@ class NodeEnv:
         node_loc = node_loc.tolist()
         # 노드 movement 상황
         node_loc.insert(0, [0.0, 0.0])  # source location 추가
-        node_loc.append([2.0, 2.0])  # destination location 추가
+        node_loc.append([3.0, 3.0])  # destination location 추가
 
         next_txr = next_txr.tolist()
         next_txr.insert(0, 1.5)  # 리스트 내 index =0인 자리에 1.5 추가
@@ -138,7 +138,7 @@ class NodeEnv:
             net_reward[i] = pos_coeff + balance_w * (cur_throughput - last_throughput) - (1 - balance_w) * action[i]
 
         node_loc.remove([0.0, 0.0])
-        node_loc.remove([2.0, 2.0])
+        node_loc.remove([3.0, 3.0])
         node_loc = np.array(node_loc)
 
         return next_state, net_reward, cur_throughput
@@ -239,7 +239,7 @@ if __name__ == '__main__':
     action_space = env.action_space
 
     episode = 0  # 1 episode = 100 step
-    num_episodes = 20000
+    num_episodes = 10000
     num_step = 100
 
     # epsilon greedy method

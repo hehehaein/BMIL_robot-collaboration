@@ -22,14 +22,14 @@ basic setup
 - moving angle ~ U(0, 360)
 """
 
-max_node = 9  # basic setup : 전체 노드 수를 미리 선언해야 계산 용이
+max_node = 16  # basic setup : 전체 노드 수를 미리 선언해야 계산 용이
 
 
 # 전체 environment
 class NodeEnv:
     def __init__(self, txr_level, txr_interval):
         # envorionment matrix에 해당하는 변수 선언
-        self.net_dim = 3
+        self.net_dim = 4
         self.one_dim = 1
         self.max_dim = self.net_dim * self.one_dim
         self.net_block = self.net_dim ** 2  # 정사각형 environment 가정
@@ -58,7 +58,7 @@ class NodeEnv:
         self.txr_level = txr_level # 1
         self.txr_interval = txr_interval # 1
         self.max_txr = self.txr_level * self.txr_interval # max_txr=1
-        self.action_space = np.arange(-self.max_txr, self.max_txr + 1, self.txr_interval) # (-1, 2, 1)
+        self.action_space = np.arange(-self.max_txr, self.max_txr + 1, self.txr_interval) # (-1, 0, 1)
         self.num_action = len(self.action_space)
 
     @staticmethod
@@ -117,7 +117,7 @@ class NodeEnv:
         node_loc = node_loc.tolist()
         # 노드 movement 상황
         node_loc.insert(0, [0.0, 0.0])  # source location 추가
-        node_loc.append([2.0, 2.0])  # destination location 추가
+        node_loc.append([3.0, 3.0])  # destination location 추가
 
         next_txr = next_txr.tolist()
         next_txr.insert(0, 1.5)  # 리스트 내 index =0인 자리에 1.5 추가
@@ -138,7 +138,7 @@ class NodeEnv:
             net_reward[i] = pos_coeff + balance_w * (cur_throughput - last_throughput) - (1 - balance_w) * action[i]
 
         node_loc.remove([0.0, 0.0])
-        node_loc.remove([2.0, 2.0])
+        node_loc.remove([3.0, 3.0])
         node_loc = np.array(node_loc)
 
         return next_state, net_reward, cur_throughput
@@ -178,7 +178,7 @@ class QlearningNode:
 
     def getAction(self, cur_state, eps, cur_txr): # epslion greedy 사용
         if (eps > np.random.rand()):  # uniform random action selection
-            action_idx = np.random.randint(0, 3)
+            action_idx = np.random.randint(0, 4)
             action = self.action_space[int(action_idx)]
             next_txr = cur_txr + action
         else:
@@ -189,8 +189,8 @@ class QlearningNode:
             next_txr = cur_txr + action
 
         # 정해진 tx range 범위 내에서만 action 고르도록...?
-        while next_txr < 0 or next_txr >= 3:
-            action_idx = np.random.randint(0, 3)
+        while next_txr < 0 or next_txr >= 4:
+            action_idx = np.random.randint(0, 4)
             action = self.action_space[int(action_idx)]
             next_txr = cur_txr + action
 
@@ -232,7 +232,7 @@ if __name__ == '__main__':
 
     tic = time.time()
 
-    txr_level = 1  # tx range 총 단계
+    txr_level = 2  # tx range 총 단계
     txr_interval = 1  # tx range 간격
 
     env = NodeEnv(txr_level, txr_interval)
@@ -240,7 +240,7 @@ if __name__ == '__main__':
 
     episode = 0  # 1 episode = 100 step
     num_episodes = 20000
-    num_step = 100
+    num_step = 200
 
     # epsilon greedy method
     eps_end = 0.01
@@ -365,12 +365,69 @@ if __name__ == '__main__':
     plt.ylabel('Throughput')
     plt.plot(throughput_trace_sum)
 
-    plt.figure()
-    plt.xlabel('episode')
-    plt.ylabel('tx range')
-    plt.title('transmission range')
-    for i in range(max_node - 2):
-        plt.plot(txr_node[1:, i], label='%s node' % i)
-        plt.legend()
-
+    plt.xlabel('agents')
+    plt.ylabel('Episodes')
+    a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t = np.vsplit(txr_node, 20)
+    a_sum = a.mean(axis=0)
+    b_sum = b.mean(axis=0)
+    c_sum = c.mean(axis=0)
+    d_sum = d.mean(axis=0)
+    e_sum = e.mean(axis=0)
+    f_sum = f.mean(axis=0)
+    g_sum = g.mean(axis=0)
+    h_sum = h.mean(axis=0)
+    i_sum = i.mean(axis=0)
+    j_sum = j.mean(axis=0)
+    k_sum = k.mean(axis=0)
+    l_sum = l.mean(axis=0)
+    m_sum = m.mean(axis=0)
+    n_sum = n.mean(axis=0)
+    o_sum = o.mean(axis=0)
+    p_sum = p.mean(axis=0)
+    q_sum = q.mean(axis=0)
+    r_sum = r.mean(axis=0)
+    s_sum = s.mean(axis=0)
+    t_sum = t.mean(axis=0)
+    # print(a_sum)
+    z_1 = np.vstack((a_sum, b_sum))
+    z_2 = np.vstack((z_1, c_sum))
+    z_3 = np.vstack((z_2, d_sum))
+    z_4 = np.vstack((z_3, e_sum))
+    z_5 = np.vstack((z_4, f_sum))
+    z_6 = np.vstack((z_5, g_sum))
+    z_7 = np.vstack((z_6, h_sum))
+    z_8 = np.vstack((z_7, i_sum))
+    z_9 = np.vstack((z_8, j_sum))
+    z_10 = np.vstack((z_9, k_sum))
+    z_11 = np.vstack((z_10, l_sum))
+    z_12 = np.vstack((z_11, m_sum))
+    z_13 = np.vstack((z_12, n_sum))
+    z_14 = np.vstack((z_13, o_sum))
+    z_15 = np.vstack((z_14, p_sum))
+    z_16 = np.vstack((z_15, q_sum))
+    z_17 = np.vstack((z_16, r_sum))
+    z_18 = np.vstack((z_17, s_sum))
+    z = np.vstack((z_18, t_sum))
+    # print(z[:,20:41])
+    # print(z)
+    """x = np.arange(0, 23, 1)
+    y = np.arange(0, 20, 0.5)
+    plt.imshow(z, vmin=0, vmax = 3)
+    plt.colorbar()
+    plt.xlim([0,22])
+    plt.ylim([0,19])
+    plt.grid(True)
+    plt.xticks(x)
+    plt.yticks(y)
+    #plt.title("3x3 random walk")
+    plt.show()"""
+    x = np.arange(0, 7, 1) #23->14
+    y = np.arange(0, 20, 0.5)
+    plt.imshow(z[:, 0:20], vmin=0, vmax=2) #vmax 8->2
+    plt.colorbar()
+    plt.xlim([0, 7]) #19->14
+    plt.ylim([0, 20]) #19->20
+    plt.grid(True)
+    plt.xticks(x)
+    plt.yticks(y)
     plt.show()
