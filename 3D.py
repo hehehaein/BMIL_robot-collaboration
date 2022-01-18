@@ -168,8 +168,8 @@ if __name__ == '__main__':
     ax.set_ylim3d(4, 0)
     ax.set_zlim3d(0, 4)
     ax.set_xticks([0,1,2,3,4])
-    ax.set_yticks([0,1,2,3,4])
-    ax.set_zticks([4,3,2,1,0])
+    ax.set_yticks([4,3,2,1,0])
+    ax.set_zticks([0,1,2,3,4])
     # scatter() 함수에 준비된 x, y, z 배열 값을 입력
     # marker = 점의 형태
     # s = 점의 크기
