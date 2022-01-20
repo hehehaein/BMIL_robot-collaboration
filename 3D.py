@@ -85,7 +85,8 @@ class setup :
         kx = destination[0]-source[0]
         ky = destination[1]-source[1]
         kz = destination[2]-source[2]
-        h=math.sqrt(math.pow((((kx*x)+(ky*y)+(kz*z))/((kx**2)+(ky**2)+(kz**2)))*kx - x, 2) + math.pow((((kx*x)+(ky*y)+(kz*z))/((kx**2)+(ky**2)+(kz**2)))*ky - y, 2) + math.pow((((kx*x)+(ky*y)+(kz*z))/((kx**2)+(ky**2)+(kz**2)))*kz - z, 2))
+        constant = (((kx*x)+(ky*y)+(kz*z))/((kx**2)+(ky**2)+(kz**2)))
+        h=math.sqrt(math.pow(constant*kx - x, 2) + math.pow(constant*ky - y, 2) + math.pow(constant*kz - z, 2))
         print("h",h)
         return h
 
@@ -121,7 +122,7 @@ if __name__ == '__main__':
     destination = np.array([4,4,4,0])
 
     i = 0 #action
-    move = np.array([-1,0,-1,0]) #action
+    move = np.array([-2,-2,-1,0]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)
