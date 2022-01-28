@@ -91,7 +91,7 @@ class setup :
         for j in range(0, total_node, 1):
             if adj_array[i][j] > 0:
                 adj_nodes = adj_nodes + 1
-                now_disperse += adj_array[i][j] / my_txr
+                now_disperse += adj_array[i][j]
         return now_disperse / (adj_nodes*my_txr)
 
     def cal_h(self, x, y, z, source, destination):
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     height_min = 1
 
     i = 0 #action
-    move = np.array([-1,0,-4,0]) #action
+    move = np.array([-2,-1,-2,0]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)
@@ -193,13 +193,13 @@ if __name__ == '__main__':
     ax.set_zlim3d(0 - 2, MAX_LOCATION + 2)
 
     color_list = ("red","orange","green","blue","purple","black")
-    sphere_array = np.empty((3, total_node), int)
+    scatter_array=np.transpose(next_arr)  #x, y, z값들을 행 별로 묶기
+
     for i in range(0,total_node,1):
         (x,y,z) = create_sphere(next_arr[i][0], next_arr[i][1],next_arr[i][2],next_arr[i][3])
         ax.auto_scale_xyz([0, 500], [0, 500], [0, 0.15])
         ax.plot_surface(x,y,z,color=color_list[i],linewidth=0,alpha=0.3)
-    #ax.view_init(40,30) #각도 지정
-        ax.scatter(scatter_array[0],scatter_array[1],scatter_array[2], marker='o', s=80, c='darkgreen')
+        ax.scatter(scatter_array[1],scatter_array[1],scatter_array[2], marker='o', s=80, c='darkgreen')
 
     plt.show()
 
