@@ -19,7 +19,7 @@ reward : throughput + 수선의 발 길이의 차 - node 이동거리 - transmis
 
 #source, n1, n2, destination
 total_node = 4
-MAX = 4  #max location
+MAX_LOCATION = 4  #max location
 
 class setup :
     def __init__(self, source, destination) :
@@ -38,21 +38,25 @@ class setup :
         next_state_array[i][1] = self.state_array[i][1] + move[1] #y축
         next_state_array[i][2] = self.state_array[i][2] + move[2] #z축
         next_state_array[i][3] = self.state_array[i][3] + move[3] #txr
+
+        if ((next_state_array[i][2]>height_max) or (next_state_array[i][2]<height_min)) :
+            next_state_array[i][2] = self.state_array[i][2]
+
         return next_state_array
 
 
     #S-D까지 연결되는지 확인하기위해서 인접행렬 만들기
     def cal_adjacency(self, next_state_array):
-        adj_array = np.empty((total_node,total_node),bool)
+        adj_array = np.empty((total_node,total_node),float)
         for i in range (0, total_node, 1):
             for j in range (0,total_node,1):
-                distance = math.sqrt(math.pow(next_state_array[i][0] - next_state_array[j][0], 2)
-                                     + math.pow(next_state_array[i][1] - next_state_array[j][1], 2)
-                                     + math.pow(next_state_array[i][2] - next_state_array[j][2], 2))
+                distance = math.sqrt(((next_state_array[i][0] - next_state_array[j][0])**2)
+                                     + ((next_state_array[i][1] - next_state_array[j][1])**2)
+                                     + ((next_state_array[i][2] - next_state_array[j][2])**2))
                 if distance <= next_state_array[i][3]:
-                    adj_array[i][j] = True
+                    adj_array[i][j] = distance
                 else :
-                    adj_array[i][j] = False
+                    adj_array[i][j] = 0
         return adj_array
 
     #인접그래프 그리기.
@@ -63,7 +67,7 @@ class setup :
             graph.add_node(i)
         for i in range(0, total_node, 1) :
             for j in range (0, total_node, 1):
-                if adj_array[i][j] :
+                if adj_array[i][j] > 0 :
                     graph.add_edge(i,j)
         nx.draw(graph)
         plt.show()
@@ -80,6 +84,15 @@ class setup :
             throughput = 0
 
         return throughput
+
+    def cal_dispersed(self,i, my_txr, adj_array):
+        adj_nodes = 0
+        now_disperse = 0
+        for j in range(0, total_node, 1):
+            if adj_array[i][j] > 0:
+                adj_nodes = adj_nodes + 1
+                now_disperse += adj_array[i][j] / my_txr
+        return now_disperse / (adj_nodes*my_txr)
 
     def cal_h(self, x, y, z, source, destination):
         kx = destination[0]-source[0]
@@ -102,9 +115,9 @@ class setup :
         energy_txr = (next_state_array[i][3])
         return energy_txr
 
-    def cal_reward(self,throughput, foot_of_perpendicular, energy_move, energy_txr):
+    def cal_reward(self,throughput, dispersed, foot_of_perpendicular, energy_move, energy_txr):
         u = 7 #constant that guarantees the reward to be non-negative
-        reward = 7 + throughput + foot_of_perpendicular - energy_move - (energy_txr*(2/5))
+        reward = 7 + throughput + dispersed + foot_of_perpendicular - energy_move - (energy_txr*(2/5))
         return reward
 
     #에피소드마다 node들의 위치 리셋시키기
@@ -119,27 +132,33 @@ if __name__ == '__main__':
 
     source = np.array([0,0,0,3])
     destination = np.array([4,4,4,0])
+    height_max = 4
+    height_min = 1
 
     i = 0 #action
-    move = np.array([-1,0,-1,0]) #action
+    move = np.array([-1,0,-4,0]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)
     adj_arr = env.cal_adjacency(next_arr)
     throughput = env.cal_throughput(adj_arr)
+    dispersed = env.cal_dispersed(i, next_arr[i][3], adj_arr)
     foot = env.cal_foot_of_perpendicular(next_arr, source, destination, i, move)
     e_move = env.cal_used_energy_to_move(move)
     e_txr = env.cal_used_energy_to_keep_txr(i,next_arr)
-    reward = env.cal_reward(throughput,foot,e_move,e_txr)
+    reward = env.cal_reward(throughput, dispersed, foot,e_move,e_txr)
 
     print("move : ",move)
     print("throughput : ",throughput)
+
+    print("dispersed : ",dispersed)
     print("foot : " ,foot)
     #print("e_move : " ,e_move)
     #print("e_txr : " ,e_txr)
     print("reward : " ,reward)
     print("array :\n", env.state_array)
     print("next_arr :\n",next_arr)
+    print("adj_arr : \n",adj_arr)
 
 
     #node들의 좌표 배열 구하기
@@ -148,7 +167,6 @@ if __name__ == '__main__':
         for j in range(0,total_node,1) :
             scatter_array[i][j]=next_arr[j][i]
     #print("scatter_array :\n",scatter_array)
-
 
     def create_sphere(cx, cy, cz, r):
 
@@ -169,15 +187,16 @@ if __name__ == '__main__':
     ax.set_xlabel('X Label')
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
-    ax.set_xlim3d(0-2, MAX+2)
-    ax.set_ylim3d(MAX+2, 0-2)
-    ax.set_zlim3d(0-2, MAX+2)
+    ax.set_xlim3d(0 - 2, MAX_LOCATION + 2)
+    ax.set_ylim3d(MAX_LOCATION + 2, 0 - 2)
+    ax.set_zlim3d(0 - 2, MAX_LOCATION + 2)
 
     color_list = ("red","orange","green","blue","purple","black")
     sphere_array = np.empty((3, total_node), int)
     for i in range(0,total_node,1):
         (x,y,z) = create_sphere(next_arr[i][0], next_arr[i][1],next_arr[i][2],next_arr[i][3])
-        ax.plot_surface(x,y,z,color=color_list[i],linewidth=0,alpha=0.4)
+        ax.auto_scale_xyz([0, 500], [0, 500], [0, 0.15])
+        ax.plot_surface(x,y,z,color=color_list[i],linewidth=0,alpha=0.3)
     #ax.view_init(40,30) #각도 지정
         ax.scatter(scatter_array[0],scatter_array[1],scatter_array[2], marker='o', s=80, c='darkgreen')
 
