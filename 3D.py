@@ -147,7 +147,7 @@ if __name__ == '__main__':
     foot = env.cal_foot_of_perpendicular(next_arr, source, destination, i, move)
     e_move = env.cal_used_energy_to_move(move)
     e_txr = env.cal_used_energy_to_keep_txr(i,next_arr)
-    reward = env.cal_reward(throughput, dispersed, foot,e_move,e_txr)
+    reward = env.cal_reward(throughput, dispersed, foot, e_move, e_txr)
 
     print("move : ",move)
     print("throughput : ",throughput)
