@@ -1,24 +1,9 @@
-import ray 
-from ray.tune.registry import register_env 
-from ray.rllib.agents import ppo 
-from ray import tune
+import numpy as np
+import pandas as pd
+import json
+import os
+import shutil
+import sys
+import gym
 
-ray.init()
-tune.run("DQN",
-         stop={"episode_reward_mean":100,
-               "timesteps_total": 100000},
-         config={'env':'CartPole-v0',
-                 "time"})
-cartpole-dqn:
-    env: CartPole-v0
-    run: DQN
-    stop:
-        episode_reward_mean: 100
-        timesteps_total: 100000
-    config:
-        # Works for both torch and tf.
-        framework: tf
-        model:
-            fcnet_hiddens: [64]
-            fcnet_activation: linear
-        n_step: 3
+from test_exercises import test_chain_env_spaces, test_chain_env_reward, test_chain_env_behavior
