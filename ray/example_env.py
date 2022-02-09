@@ -1,11 +1,15 @@
 import gym
 import numpy as np
 from gym.utils import seeding
+import random
 
 # ~number of relay node
 N = 2
 # ~transmission radius max
 R_MAX = 4
+#location x,y,z
+MIN_LOC = 0
+MAX_LOC = 4
 
 class Example_v0 (gym.Env):
 
@@ -31,7 +35,7 @@ class Example_v0 (gym.Env):
         }
 
 
-    def __init__ (self):
+    """def __init__ (self):
         # ~the action space ranges [x,y,z,r] where {-1,0,1}:
         # ~0 :-1
         # ~1 :0
@@ -43,7 +47,7 @@ class Example_v0 (gym.Env):
         self.observation_space = gym.spaces.Box(0, R_MAX, shape=(N+2, 4), dtype=np.int8)  # origin : self.observation_space = ~~
 
         # possible positions to chose on `reset()`
-        self.goal = int((self.LF_MIN + self.RT_MAX - 1) / 2)
+        # self.goal = int((self.LF_MIN + self.RT_MAX - 1) / 2)
 
         self.init_positions = list(range(self.LF_MIN, self.RT_MAX))
         self.init_positions.remove(self.goal)
@@ -52,10 +56,28 @@ class Example_v0 (gym.Env):
         # (e.g., for debugging)
         self.seed()
 
-        self.reset()
+        self.reset()"""
+
+    def __init__(self,i) :
+        #self.state_space = np.empty((N + 2, 4), int)
+        self.action_space = np.arange(-1,1,1) #(-1,0,1)
+        self.agent_i = i
+
+        """for i in range(N+2):
+            for j in range(4):
+                k = np.random.randint(MIN_LOC, MAX_LOC) #randint : 균일분포의 정수 난수 1개
+                self.state_space[i][j]=k
+
+        for i in range(3):
+            k = np.random.randint(MIN_LOC, MAX_LOC)
+            self.action_space[i]=k
+        k=np.random.randint(0,R_MAX)
+        self.action_space[3]=k  # txr 설정"""
 
 
-    def reset (self):
+
+
+    def reset (self, source, destination, max_height):
         """
         Reset the state of the environment and returns an initial observation.
 
@@ -63,17 +85,46 @@ class Example_v0 (gym.Env):
         -------
         observation (object): the initial observation of the space.
         """
-        self.position = self.np_random.choice(self.init_positions)
+
+
+
+        #self.position = self.np_random.choice(self.init_positions)
         self.count = 0
 
-        # for this environment, state is simply the position
-        self.state = self.position
+        self.state = np.empty((N + 2, 4), int)
+        #for i in range (0,N,1) :
+        #    self.state_array[i+2,:]= [destination[0], destination[1], max_height, R_MAX]
+        #self.state[N, :] = source[:] #source
+        #self.state[N+1, :] = destination[:] #destination
+
+        self.state[0, :] = [destination[0], destination[1], max_height, R_MAX]
+        self.state[1, :] = [3, 3, 3, 3]
+        self.state[2, :] = source[:] #source
+        self.state[3, :] = destination[:] #destination
+
         self.reward = 0
         self.done = False
         self.info = {}
 
         return self.state
 
+
+    def check_state(self,state):
+        #노드의 위치가 이동구간을 벗어갔을때 return 1
+        for i in range(N+2):
+            for j in range(3):
+                if state[i][j] < MIN_LOC or MAX_LOC < state[i][j] :
+                    return 1
+
+        # 노드의 txr이 범위를 벗어났을때 return 1
+        for i in range(N + 2):
+            if state[i][3] < 0 or R_MAX < state[i][3] :
+                return 1
+
+        #노드의 위치가 이동구간 안에 있고, txr도 범위안에 있으면 return 0
+        return 0
+
+        return 0
 
     def step (self, action):
         """
@@ -119,43 +170,8 @@ class Example_v0 (gym.Env):
             assert self.action_space.contains(action)
             self.count += 1
 
-            if action == self.MOVE_LF:
-                if self.position == self.LF_MIN:
-                    # invalid
-                    self.reward = self.REWARD_AWAY
-                else:
-                    self.position -= 1
 
-                    if self.position == self.goal:
-                        # on goal now
-                        self.reward = self.REWARD_GOAL
-                        self.done = 1
-                    elif self.position < self.goal:
-                        # moving away from goal
-                        self.reward = self.REWARD_AWAY
-                    else:
-                        # moving toward goal
-                        self.reward = self.REWARD_STEP
 
-            elif action == self.MOVE_RT:
-                if self.position == self.RT_MAX:
-                    # invalid
-                    self.reward = self.REWARD_AWAY
-                else:
-                    self.position += 1
-
-                    if self.position == self.goal:
-                        # on goal now
-                        self.reward = self.REWARD_GOAL
-                        self.done = 1
-                    elif self.position > self.goal:
-                        # moving away from goal
-                        self.reward = self.REWARD_AWAY
-                    else:
-                        # moving toward goal
-                        self.reward = self.REWARD_STEP
-
-            self.state = self.position
             self.info["dist"] = self.goal - self.position
 
         try:
