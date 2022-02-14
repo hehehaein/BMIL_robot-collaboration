@@ -2,6 +2,9 @@ import gym
 import numpy as np
 from gym.utils import seeding
 import random
+import math
+import networkx as nx
+from matplotlib import pyplot as plt
 
 # ~number of relay node
 N = 2
@@ -12,7 +15,6 @@ MIN_LOC = 0
 MAX_LOC = 4
 
 class Example_v0 (gym.Env):
-
 
     # possible actions
     MOVE_LF = 0
@@ -85,9 +87,6 @@ class Example_v0 (gym.Env):
         -------
         observation (object): the initial observation of the space.
         """
-
-
-
         #self.position = self.np_random.choice(self.init_positions)
         self.count = 0
 
@@ -124,9 +123,95 @@ class Example_v0 (gym.Env):
         #노드의 위치가 이동구간 안에 있고, txr도 범위안에 있으면 return 0
         return 0
 
+    def check_action(self, action):
+        for i in range(0,4,1):
+            if not (action[i] in [-1,0,1]) :
+                return 1
+
+        # 노드의 위치가 이동구간 안에 있고, txr도 범위안에 있으면 return 0
         return 0
 
-    def step (self, action):
+    # S-D까지 연결되는지 확인하기위해서 인접행렬 만들기
+    def cal_adjacency(self, next_state_array):
+        adj_array = np.empty((N+2, N+2), float)
+        for i in range(0, N+2, 1):
+            for j in range(0, N+2, 1):
+                distance = math.sqrt(((next_state_array[i][0] - next_state_array[j][0]) ** 2)
+                                     + ((next_state_array[i][1] - next_state_array[j][1]) ** 2)
+                                     + ((next_state_array[i][2] - next_state_array[j][2]) ** 2))
+                if distance <= next_state_array[i][3]:
+                    adj_array[i][j] = distance
+                else:
+                    adj_array[i][j] = 0
+        return adj_array
+
+        # 인접그래프 그리기.
+        # S-D까지의 경로가 있나 확인 -> 홉의 개수(has_path최단거리)찾기 -> throughput 구하기
+
+    def cal_throughput(self, adj_array):
+        graph = nx.Graph()
+        for i in range(0, N+2, 1):
+            graph.add_node(i)
+        for i in range(0, N+2, 1):
+            for j in range(0, N+2, 1):
+                if adj_array[i][j] > 0:
+                    graph.add_edge(i, j)
+        nx.draw(graph)
+        plt.show()
+
+        if nx.has_path(graph, N+2 - 2, N+2 - 1):
+            path_hop = nx.shortest_path_length(graph, N+2 - 2, N+2 - 1)
+        else:
+            path_hop = np.inf
+
+        print("path_hop : ", path_hop)
+        if path_hop != np.inf:
+            throughput = 20 / path_hop
+        else:
+            throughput = 0
+
+        return throughput
+
+    def cal_dispersed(self, i, my_txr, adj_array):
+        adj_nodes = 0
+        now_disperse = 0
+        for j in range(0, N+2, 1):
+            if adj_array[i][j] > 0:
+                adj_nodes = adj_nodes + 1
+                now_disperse += adj_array[i][j]
+        return now_disperse / (adj_nodes * my_txr)
+
+    def cal_h(self, x, y, z, source, destination):
+        kx = destination[0] - source[0]
+        ky = destination[1] - source[1]
+        kz = destination[2] - source[2]
+        constant = (((kx * x) + (ky * y) + (kz * z)) / ((kx ** 2) + (ky ** 2) + (kz ** 2)))
+        h = math.sqrt(math.pow(constant * kx - x, 2) + math.pow(constant * ky - y, 2) + math.pow(constant * kz - z, 2))
+        print("h", h)
+        return h
+
+        # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
+
+    def cal_foot_of_perpendicular(self, next_state_array, i, move):
+        foot_of_perpendicular = self.cal_h(self.state_array[i][0], self.state_array[i][1], self.state_array[i][2],vself.state_array[N], self.state_array[N+1]) \
+                                - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], self.state_array[N], self.state_array[N+1]) \
+                                - move[3]
+        return foot_of_perpendicular
+
+    def cal_used_energy_to_move(self, move):
+        energy_move = math.sqrt((math.pow(move[0], 2) + math.pow(move[1], 2) + math.pow(move[2], 2)))
+        return energy_move
+
+    def cal_used_energy_to_keep_txr(self, i, next_state_array):
+        energy_txr = (next_state_array[i][3])
+        return energy_txr
+
+    def cal_reward(self, throughput, dispersed, foot_of_perpendicular, energy_move, energy_txr):
+        u = 7  # constant that guarantees the reward to be non-negative
+        reward = 7 + throughput + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
+        return reward
+
+    def step (self, i, action):
         """
         The agent takes a step in the environment.
 
@@ -163,23 +248,33 @@ class Example_v0 (gym.Env):
             # code should never reach this point
             print("EPISODE DONE!!!")
 
-        elif self.count == self.MAX_STEPS:
+        elif self.count == N * self.MAX_STEPS :
             self.done = True;
 
         else:
-            assert self.action_space.contains(action)
+            assert self.check_action(action)
             self.count += 1
 
+            next_array = self.state
+            next_array[i][0] += action[0]
+            next_array[i][1] += action[1]
+            next_array[i][2] += action[2]
+            next_array[i][3] += action[3]
 
-
-            self.info["dist"] = self.goal - self.position
+            adj_arr = self.cal_adjacency(next_array)
+            throughput = self.cal_throughput(adj_arr)
+            dispersed = self.cal_dispersed(i, next_array[i][3], adj_arr)
+            foot = self.cal_foot_of_perpendicular(next_array, i, action)
+            e_move = self.cal_used_energy_to_move(action)
+            e_txr = self.cal_used_energy_to_keep_txr(i, next_array)
+            self.reward = self.cal_reward(throughput, dispersed, foot, e_move, e_txr)
 
         try:
-            assert self.observation_space.contains(self.state)
+            assert self.observation_space.contains(next_array)
         except AssertionError:
             print("INVALID STATE", self.state)
 
-        return [self.state, self.reward, self.done, self.info]
+        return [next_array, self.reward, self.done]
 
 
     def render (self, mode="human"):

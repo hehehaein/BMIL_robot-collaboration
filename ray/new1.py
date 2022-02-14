@@ -1,4 +1,4 @@
-from example_env import Example_v0
+from my_env import Example_v0
 from ray.tune.registry import register_env
 import gym
 import os
@@ -64,7 +64,7 @@ def main ():
 
     for step in range(n_step):
         action = agent.compute_action(state)
-        state, reward, done, info = env.step(action)
+        state, reward, done = env.step(i,action)
         sum_reward += reward
 
         env.render()
