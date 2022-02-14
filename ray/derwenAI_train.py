@@ -15,7 +15,7 @@ R_MAX = 4
 MIN_LOC = 0
 MAX_LOC = 4
 
-def get_action(eps,action_space):
+"""def get_action(eps,action_space):
     action = np.empty(4)
 
     if (eps > np.random.rand()):  # uniform random action selection
@@ -35,7 +35,7 @@ def get_action(eps,action_space):
         action = self.action_space[int(action_idx)]
         next_txr = cur_txr + action
 
-    return action, action_idx, next_txr
+    return action, action_idx, next_txr"""
 
 def main ():
     # init directory in which to save checkpoints
@@ -91,14 +91,12 @@ def main ():
     sum_reward = 0
     n_step = 20
 
-    action = np.empty((N, 4),int)
     for step in range(n_step):
-        for i in range(N + 2):
-            action[i] = agent.compute_action(state)
-            state, reward, done = env.step(i,action)
-            sum_reward += reward
+        action = agent.compute_action(state)
+        state, reward, done, info = env.step(action)
+        sum_reward += reward
 
-        env.render(state)
+        env.render()
 
         if done == 1:
             # report at the end of each episode

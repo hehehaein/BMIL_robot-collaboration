@@ -60,10 +60,11 @@ class Example_v0 (gym.Env):
 
         self.reset()"""
 
-    def __init__(self,i) :
-        #self.state_space = np.empty((N + 2, 4), int)
-        self.action_space = np.arange(-1,1,1) #(-1,0,1)
-        self.agent_i = i
+    def __init__(self) :
+        # (0,1,2,3,4,5)... -> (-2,-1,0,1,2)
+        self.state_space = gym.spaces.MultiDiscrete([MAX_LOC-MIN_LOC+1, MAX_LOC-MIN_LOC+1, MAX_LOC-MIN_LOC+1, R_MAX])
+        # (0,1,2) -> (-1,0,1)
+        self.action_space = gym.spaces.Discrete(3)
 
         """for i in range(N+2):
             for j in range(4):
@@ -75,9 +76,6 @@ class Example_v0 (gym.Env):
             self.action_space[i]=k
         k=np.random.randint(0,R_MAX)
         self.action_space[3]=k  # txr 설정"""
-
-
-
 
     def reset_ (self, source, destination, max_height):
         """
@@ -97,13 +95,11 @@ class Example_v0 (gym.Env):
         #self.state[N+1, :] = destination[:] #destination
 
         self.state[0, :] = [destination[0], destination[1], max_height, R_MAX]
-        self.state[1, :] = [3, 3, 3, 3]
-        self.state[2, :] = source[:] #source
-        self.state[3, :] = destination[:] #destination
+        self.state[1, :] = source[:] #source
+        self.state[2, :] = destination[:] #destination
 
         self.reward = 0
         self.done = False
-        self.info = {}
 
         return self.state
 
@@ -193,7 +189,7 @@ class Example_v0 (gym.Env):
         # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
 
     def cal_foot_of_perpendicular(self, next_state_array, i, move):
-        foot_of_perpendicular = self.cal_h(self.state_array[i][0], self.state_array[i][1], self.state_array[i][2],vself.state_array[N], self.state_array[N+1]) \
+        foot_of_perpendicular = self.cal_h(self.state_array[i][0], self.state_array[i][1], self.state_array[i][2],self.state_array[N], self.state_array[N+1]) \
                                 - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], self.state_array[N], self.state_array[N+1]) \
                                 - move[3]
         return foot_of_perpendicular
@@ -244,6 +240,7 @@ class Example_v0 (gym.Env):
                  However, official evaluations of your agent are not allowed to
                  use this for learning.
         """
+
         if self.done:
             # code should never reach this point
             print("EPISODE DONE!!!")
@@ -252,7 +249,11 @@ class Example_v0 (gym.Env):
             self.done = True;
 
         else:
-            assert self.check_action(action)
+            for i in range(3):
+                action[i] += 1 # (-1,0,1) -> (0,1,2)
+            assert self.action_space.contains(action)
+            for i in range(3):
+                action[i] -= 1 # (0,1,2) -> (-1,0,1)
             self.count += 1
 
             next_array = self.state
@@ -271,7 +272,13 @@ class Example_v0 (gym.Env):
 
         try:
             # assert self.observation_space.contains(next_array)
+            for i in range(N+2):
+                for j in range(3):
+                    next_array[i][j] -= MIN_LOC # (-3, -2, -1, 0, 1, 2) -> (0, 1, 2, 3, 4, 5)
             assert self.check_state(next_array)
+            for i in range(N+2):
+                for j in range(3):
+                    next_array[i][j] += MIN_LOC # (0, 1, 2, 3, 4, 5) -> (-3, -2, -1, 0, 1, 2)
         except AssertionError:
             print("INVALID STATE", self.state)
 
