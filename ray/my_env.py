@@ -79,7 +79,7 @@ class Example_v0 (gym.Env):
 
 
 
-    def reset (self, source, destination, max_height):
+    def reset_ (self, source, destination, max_height):
         """
         Reset the state of the environment and returns an initial observation.
 
@@ -270,14 +270,15 @@ class Example_v0 (gym.Env):
             self.reward = self.cal_reward(throughput, dispersed, foot, e_move, e_txr)
 
         try:
-            assert self.observation_space.contains(next_array)
+            # assert self.observation_space.contains(next_array)
+            assert self.check_state(next_array)
         except AssertionError:
             print("INVALID STATE", self.state)
 
         return [next_array, self.reward, self.done]
 
 
-    def render (self, mode="human"):
+    def render (self, state, mode="human"):
         """Renders the environment.
 
         The set of supported modes varies per environment. (And some
@@ -301,9 +302,41 @@ class Example_v0 (gym.Env):
         Args:
             mode (str): the mode to render with
         """
-        s = "position: {:2d}  reward: {:2d}  info: {}"
-        print(s.format(self.state, self.reward, self.info))
+        # s = "position: {:2d}  reward: {:2d}  info: {}"
+        # print(s.format(self.state, self.reward, self.info))
 
+        def create_sphere(cx, cy, cz, r):
+            u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
+
+            x = np.cos(u) * np.sin(v)
+            y = np.sin(u) * np.sin(v)
+            z = np.cos(v)
+            # shift and scale sphere
+            x = r * x + cx
+            y = r * y + cy
+            z = r * z + cz
+            return (x, y, z)
+
+        # 3D 그래프 그리기
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_xlabel('X Label')
+        ax.set_ylabel('Y Label')
+        ax.set_zlabel('Z Label')
+        ax.set_xlim3d(0 - 2, MAX_LOC + 2)
+        ax.set_ylim3d(MAX_LOC + 2, 0 - 2)
+        ax.set_zlim3d(0 - 2, MAX_LOC + 2)
+
+        color_list = ("red", "orange", "green", "blue", "purple", "black")
+        scatter_array = np.transpose(state)  # x, y, z값들을 행 별로 묶기
+
+        for i in range(0, N+2, 1):
+            (x, y, z) = create_sphere(state[i][0], state[i][1], state[i][2], state[i][3])
+            ax.auto_scale_xyz([0, 500], [0, 500], [0, 0.15])
+            ax.plot_surface(x, y, z, color=color_list[i], linewidth=0, alpha=0.3)
+            ax.scatter(scatter_array[1], scatter_array[1], scatter_array[2], marker='o', s=80, c='darkgreen')
+
+        plt.show()
 
     def seed (self, seed=None):
         """Sets the seed for this env's random number generator(s).

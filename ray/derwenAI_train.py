@@ -5,7 +5,37 @@ import os
 import ray
 import ray.rllib.agents.ppo as ppo
 import shutil
+import numpy as np
 
+# ~number of relay node
+N = 2
+# ~transmission radius max
+R_MAX = 4
+#location x,y,z
+MIN_LOC = 0
+MAX_LOC = 4
+
+def get_action(eps,action_space):
+    action = np.empty(4)
+
+    if (eps > np.random.rand()):  # uniform random action selection
+        action_idx = np.random.randint(0, 3)
+        for i in range(4):
+            action[i] = action_space[int(action_idx)]
+    else:
+        # 구해놓은 Q table을 사용
+        state_action = self.q_table[int(cur_state), :]
+        action_idx = np.argmax(state_action)
+        action = self.action_space[int(action_idx)]
+        next_txr = cur_txr + action
+
+    # 정해진 tx range 범위 내에서만 action 고르도록...?
+    while next_txr < 0 or next_txr >= 3:
+        action_idx = np.random.randint(0, 3)
+        action = self.action_space[int(action_idx)]
+        next_txr = cur_txr + action
+
+    return action, action_idx, next_txr
 
 def main ():
     # init directory in which to save checkpoints
@@ -21,7 +51,7 @@ def main ():
     ray.init(ignore_reinit_error=True)
 
     # register the custom environment
-    select_env = "example-v0"
+    select_env = "my_env"
     register_env(select_env, lambda config: Example_v0())
 
 
@@ -30,7 +60,7 @@ def main ():
     config["log_level"] = "WARN"
     agent = ppo.PPOTrainer(config, env=select_env)
 
-    status = "{:2d} reward {:6.2f}/{:6.2f}/{:6.2f} len {:4.2f} saved {}"
+    status = "{:2d} reward {:6.2f}/{:6.2f}/{:6.2f} saved {}"
     n_iteration = 5
 
     # train a policy with RLlib using PPO
@@ -43,7 +73,6 @@ def main ():
                 result["episode_reward_min"],
                 result["episode_reward_mean"],
                 result["episode_reward_max"],
-                result["episode_len_mean"], # len 숫자
                 checkpoint_file # saved file 주소
                 ))
 
@@ -58,16 +87,18 @@ def main ():
     agent.restore(checkpoint_file)
     env = gym.make(select_env)
 
-    state = env.reset()
+    state = env.reset_()
     sum_reward = 0
     n_step = 20
 
+    action = np.empty((N, 4),int)
     for step in range(n_step):
-        action = agent.compute_action(state)
-        state, reward, done = env.step(i,action)
-        sum_reward += reward
+        for i in range(N + 2):
+            action[i] = agent.compute_action(state)
+            state, reward, done = env.step(i,action)
+            sum_reward += reward
 
-        env.render()
+        env.render(state)
 
         if done == 1:
             # report at the end of each episode
