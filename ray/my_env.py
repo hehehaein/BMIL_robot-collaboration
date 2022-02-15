@@ -77,7 +77,7 @@ class Example_v0 (gym.Env):
         k=np.random.randint(0,R_MAX)
         self.action_space[3]=k  # txr 설정"""
 
-    def reset_ (self, source, destination, max_height):
+    def reset (self, source, destination, max_height):
         """
         Reset the state of the environment and returns an initial observation.
 

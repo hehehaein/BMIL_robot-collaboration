@@ -65,7 +65,7 @@ def main ():
 
     # train a policy with RLlib using PPO
     for n in range(n_iteration):
-        result = agent.train()
+        result = agent.tgym-examplerain()
         checkpoint_file = agent.save(checkpoint_root)
 
         print(status.format(
