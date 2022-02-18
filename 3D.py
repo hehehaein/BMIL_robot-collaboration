@@ -72,8 +72,10 @@ class setup :
         nx.draw(graph)
         plt.show()
 
-        if nx.has_path(graph,total_node-2, total_node-1) :
-            path_hop = nx.shortest_path_length(graph,total_node-2, total_node-1)
+        #if nx.has_path(graph, total_node-2, total_node-1) :
+            #path_hop = nx.shortest_path_length(graph, total_node-2, total_node-1)
+        if nx.complete_graph(total_node):
+            path_hop = total_node-1
         else :
             path_hop = np.inf
 
@@ -137,7 +139,7 @@ if __name__ == '__main__':
     height_min = 1
 
     i = 0 #action
-    move = np.array([-2,-1,-2,0]) #action
+    move = np.array([-3,-3,-2,0]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)
