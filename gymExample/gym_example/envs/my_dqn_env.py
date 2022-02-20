@@ -138,7 +138,7 @@ class My_DQN(gym.Env):
 
         #self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3)))
         #self.action_space = gym.spaces.MultiDiscrete([3,3,3,3])
-        self.action_space = gym.spaces.Discrete(80)
+        self.action_space = gym.spaces.Discrete(81)
 
     def reset(self):
         """
