@@ -102,7 +102,7 @@ class My_DQN(gym.Env):
         "render.modes": ["human"]
     }
 
-    MAX_STEPS = 2000
+    MAX_STEPS = 5
     # ~number of relay node
     N = 2
     # ~transmission radius max

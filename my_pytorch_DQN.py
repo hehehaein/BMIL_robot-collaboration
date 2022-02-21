@@ -85,7 +85,6 @@ plt.ion()
 # GPU를 사용할 경우
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 ######################################################################
 # 재현 메모리(Replay Memory)
 # -------------------------------
@@ -195,10 +194,9 @@ class DQN(nn.Module):
 
     def __init__(self):
         super(DQN, self).__init__()
-        self.linear1 = nn.Linear(1, 16)
-        self.linear2 = nn.Linear(16, 32)
-        self.linear3 = nn.Linear(32, 1)
-
+        self.linear1 = nn.Linear(4, 64)
+        self.linear2 = nn.Linear(64, 64)
+        self.linear3 = nn.Linear(64, 81)
         """# Linear 입력의 연결 숫자는 conv2d 계층의 출력과 입력 이미지의 크기에
         # 따라 결정되기 때문에 따로 계산을 해야합니다.
         def conv2d_size_out(size, kernel_size = 5, stride = 2):
@@ -212,9 +210,11 @@ class DQN(nn.Module):
     # ([[left0exp,right0exp]...]) 를 반환합니다.
     def forward(self, x):
         #x = x.to(device)
+        #print('forward\n',x)
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         return self.linear3(x)
+
 
 ######################################################################
 # 학습
@@ -234,7 +234,7 @@ class DQN(nn.Module):
 #    포함 된 셀 밑에 있으며, 매 에피소드마다 업데이트됩니다.
 #
 
-BATCH_SIZE = 128
+BATCH_SIZE = 128 #128
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
@@ -273,7 +273,7 @@ def select_action(state):
             # t.max (1)은 각 행의 가장 큰 열 값을 반환합니다.
             # 최대 결과의 두번째 열은 최대 요소의 주소값이므로,
             # 기대 보상이 더 큰 행동을 선택할 수 있습니다.
-            return policy_net(state).max(1)[1].view(1, 1)
+            return policy_net(state).max(-1)[1].view(1, 1)
     else:
         return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
 
@@ -326,27 +326,33 @@ def optimize_model():
     # detailed explanation). 이것은 batch-array의 Transitions을 Transition의 batch-arrays로
     # 전환합니다.
     batch = Transition(*zip(*transitions))
-
     # 최종이 아닌 상태의 마스크를 계산하고 배치 요소를 연결합니다
     # (최종 상태는 시뮬레이션이 종료 된 이후의 상태)
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                           batch.next_state)), device=device, dtype=torch.bool)
-    non_final_next_states = torch.cat([s for s in batch.next_state
-                                                if s is not None])
-    state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward)
+    for s in batch.next_state:
+        if s is not None:
+            non_final_next_states = torch.stack(tuple(torch.Tensor(s)))
+
+    state_batch = torch.stack(batch.state)
+    action_batch = torch.stack(batch.action)
+    reward_batch = torch.stack(batch.reward)
 
     # Q(s_t, a) 계산 - 모델이 Q(s_t)를 계산하고, 취한 행동의 열을 선택합니다.
     # 이들은 policy_net에 따라 각 배치 상태에 대해 선택된 행동입니다.
-    state_action_values = policy_net(state_batch).gather(1, action_batch)
+    #print('state_batch\n',state_batch)
+    #print('policy',policy_net(state_batch).size())
+    #print('state', state_batch.size())
+    #print('action', action_batch.squeeze(1).squeeze(1).size())
+    #print(action_batch)
+    state_action_values = policy_net(state_batch).gather(-1, action_batch.squeeze(1))
 
     # 모든 다음 상태를 위한 V(s_{t+1}) 계산
     # non_final_next_states의 행동들에 대한 기대값은 "이전" target_net을 기반으로 계산됩니다.
     # max(1)[0]으로 최고의 보상을 선택하십시오.
     # 이것은 마스크를 기반으로 병합되어 기대 상태 값을 갖거나 상태가 최종인 경우 0을 갖습니다.
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
+    next_state_values[non_final_mask] = target_net(non_final_next_states).max(-1)[0].detach()
     # 기대 Q 값 계산
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -374,17 +380,19 @@ def optimize_model():
 # 의미있는 개선을 위해서 300 이상의 더 많은 에피소드를 실행해 보십시오.
 #
 
-num_episodes = 50
+num_episodes = 1
 for i_episode in range(num_episodes):
     # 환경과 상태 초기화
     state = env.reset()
-    state = torch.from_numpy(state).float().unsqueeze(0).to(device)
+    state = torch.Tensor(state)
+    # print('state type : ',state.type())
     for t in count():
         # 행동 선택과 수행
         action = select_action(state)
         next_state, reward, done, _ = env.step(action.item())
         reward = torch.tensor([reward], device=device)
 
+        next_state = torch.Tensor(next_state)
         if done:
             next_state = None
 
@@ -405,7 +413,7 @@ for i_episode in range(num_episodes):
         target_net.load_state_dict(policy_net.state_dict())
 
 print('Complete')
-env.render()
+#env.render()
 env.close()
 plt.ioff()
 plt.show()

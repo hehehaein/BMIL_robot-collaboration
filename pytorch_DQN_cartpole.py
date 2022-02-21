@@ -211,6 +211,7 @@ class DQN(nn.Module):
     # ([[left0exp,right0exp]...]) 를 반환합니다.
     def forward(self, x):
         x = x.to(device)
+        print('forward', x, '&')
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
@@ -390,7 +391,6 @@ def optimize_model():
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
-
     # Q(s_t, a) 계산 - 모델이 Q(s_t)를 계산하고, 취한 행동의 열을 선택합니다.
     # 이들은 policy_net에 따라 각 배치 상태에 대해 선택된 행동입니다.
     state_action_values = policy_net(state_batch).gather(1, action_batch)
