@@ -335,6 +335,11 @@ def optimize_model():
 
     # 모델 최적화
     optimizer.zero_grad()
+    if i_episode is (num_episodes-1) :
+        # 옵티마이저의 state_dict 출력
+        print("Optimizer's state_dict:")
+        for var_name in optimizer.state_dict():
+            print(var_name, "\t", optimizer.state_dict()[var_name])
     loss.backward()
     for param in policy_net.parameters():
         param.grad.data.clamp_(-1, 1)
@@ -353,10 +358,8 @@ def optimize_model():
 # 의미있는 개선을 위해서 300 이상의 더 많은 에피소드를 실행해 보십시오.
 #
 rewards = []
-scatters_front = []
-scatters_middle = []
-scatters_tail = []
-i_episode = 0
+scatters = []
+
 for i_episode in range(num_episodes):
     print(i_episode)
     # 환경과 상태 초기화
@@ -368,6 +371,7 @@ for i_episode in range(num_episodes):
         action = select_action(state)
         next_state, reward, done, _ = env.step(action.item())
 
+        scatters.append(np.array(next_state))
         rewards.append(reward)
 
         reward = torch.tensor([reward], device=device)
@@ -382,20 +386,17 @@ for i_episode in range(num_episodes):
         # 다음 상태로 이동
         state = next_state
 
-        if i_episode is (num_episodes-1):
-            print(next_state)
-            scatters_tail.append(np.array(next_state))
-        elif i_episode == 20:
-            scatters_middle.append(np.array(next_state))
-        elif i_episode == 0:
-            scatters_front.append(np.array(next_state))
-
 
         # (정책 네트워크에서) 최적화 한단계 수행
         optimize_model()
+        if i_episode is (num_episodes - 1):
+            # 옵티마이저의 state_dict 출력
+            torch.save(policy_net.state_dict(), PATH)
+            model = TheModelClass(*args, **kwargs)
+            model.load_state_dict(torch.load(PATH))
+            model.eval()
+
         if done:
-            #episode_durations.append(t + 1)
-            #plot_durations()
             break
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
@@ -437,28 +438,24 @@ ax = fig.add_subplot(111, projection='3d')
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_zlabel('Z')
-ax.set_xlim3d(0, env.MAX_LOC)
-ax.set_ylim3d(env.MAX_LOC, 0)
-ax.set_zlim3d(0, env.MAX_LOC)
+ax.set_xlim3d(0 - 2, env.MAX_LOC + 2)
+ax.set_ylim3d(env.MAX_LOC + 2, 0 - 2)
+ax.set_zlim3d(0 - 2, env.MAX_LOC + 2)
 color_list = ("olive", "orange", "green", "blue", "purple", "black", "cyan", "pink", "brown", "darkslategray")
 
 nodes = []
 nodes.append(env.source)
 nodes.append(env.dest)
 nodes.append(env.agent2)
-"""for i in range(0, env.MAX_STEPS//10, 1):
-    for j in range(10):
-        # 구 그리기
-        (x, y, z) = create_sphere(scatters[i][0], scatters[i][1], scatters[i][2], scatters[i][3])
-        ax.auto_scale_xyz([0, 500], [0, 500], [0, 0.15])
-        ax.plot_surface(x, y, z, color=color_list[i%6], linewidth=0, alpha=0.1)
-        # 점 찍기
-        ax.scatter(np.transpose(scatters)[0], np.transpose(scatters)[1], np.transpose(scatters)[2],marker='o', s=60, c=color_list[i])"""
-ax.scatter(np.transpose(scatters_front)[0], np.transpose(scatters_front)[1], np.transpose(scatters_front)[2],marker='o', s=60, c='orange')
-ax.scatter(np.transpose(scatters_middle)[0], np.transpose(scatters_middle)[1], np.transpose(scatters_middle)[2],marker='o', s=60, c='red')
-ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.transpose(scatters_tail)[2],marker='o', s=60, c='purple')
+for i in range(0, env.MAX_STEPS, 1):
+    # 구 그리기
+    """(x, y, z) = create_sphere(scatters[i][0], scatters[i][1], scatters[i][2], scatters[i][3])
+    ax.auto_scale_xyz([0, 500], [0, 500], [0, 0.15])
+    ax.plot_surface(x, y, z, color=color_list[i%6], linewidth=0, alpha=0.1)"""
+    # 점 찍기
+    ax.scatter(np.transpose(scatters)[0], np.transpose(scatters)[1], np.transpose(scatters)[2],marker='o', s=80, c='purple')
 
-ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
+ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='red')
 plt.show()
 #env.render()
 env.close()

@@ -102,7 +102,7 @@ class My_DQN(gym.Env):
         "render.modes": ["human"]
     }
 
-    MAX_STEPS = 5
+    MAX_STEPS = 40
     # ~number of relay node
     N = 2
     # ~transmission radius max
@@ -115,7 +115,7 @@ class My_DQN(gym.Env):
     MIN_HEIGHT = 0
 
     source = np.array((MIN_LOC, MIN_LOC, MIN_HEIGHT, R_MAX))
-    dest = np.array((MAX_LOC, MAX_LOC, MAX_HEIGHT, R_MAX))
+    dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, R_MAX))
     agent2 = np.array((3, 3, 3, 3))
 
     def __init__(self):
@@ -133,7 +133,7 @@ class My_DQN(gym.Env):
         num_state_space = len(self.state_space) #81"""
 
         self.observation_space = gym.spaces.Box(low=np.array([self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0]),
-                                                high=np.array([self.MAX_LOC, self.MAX_LOC, self.MAX_HEIGHT, self.R_MAX]),
+                                                high=np.array([self.MAX_LOC, self.MAX_LOC, self.MAX_LOC, self.R_MAX]),
                                                 dtype=int)
 
         #self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3)))
@@ -151,6 +151,7 @@ class My_DQN(gym.Env):
         self.count = 0
 
         self.state = self.dest.copy()
+        self.state[2] = self.MAX_HEIGHT
         self.reward = 0
         self.done = False
         self.info = {}
@@ -212,8 +213,8 @@ class My_DQN(gym.Env):
             # print('my_env action : ', action)
             assert self.action_space.contains(action)
             self.count += 1
-
             real_action = self.translate_action(action)
+            #print(real_action)
             self.next_state = self.state
             # action을 모두 수행
             for i in range(4):
