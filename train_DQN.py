@@ -235,11 +235,11 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 128 #128
-num_episodes = 40
+num_episodes = 400
 GAMMA = 0.9
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 1e-3
+EPS_DECAY = 1e-4
 TARGET_UPDATE = 10
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
@@ -256,8 +256,8 @@ target_net = DQN().to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
-optimizer = optim.RMSprop(policy_net.parameters())
-memory = ReplayMemory(10000)
+optimizer = optim.Adam(policy_net.parameters(),lr=1e-6)
+memory = ReplayMemory(300)
 
 
 steps_done = 0
@@ -296,6 +296,7 @@ def select_action(state):
 # 이것은 대개 설정한 스텝 숫자이지만 단순화를 위해 에피소드를 사용합니다.
 #
 
+losses = []
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
@@ -332,6 +333,7 @@ def optimize_model():
     # Huber 손실 계산
     criterion = nn.SmoothL1Loss()
     loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+    losses.append(loss.item())
 
     # 모델 최적화
     optimizer.zero_grad()
@@ -352,11 +354,16 @@ def optimize_model():
 # 아래에서 `num_episodes` 는 작게 설정됩니다. 노트북을 다운받고
 # 의미있는 개선을 위해서 300 이상의 더 많은 에피소드를 실행해 보십시오.
 #
+throughputs = []
 rewards = []
 scatters_front = []
 scatters_middle = []
 scatters_tail = []
+
+show_actions = []
+show_next_states = []
 i_episode = 0
+reward_count = 0
 for i_episode in range(num_episodes):
     print(i_episode)
     # 환경과 상태 초기화
@@ -366,12 +373,22 @@ for i_episode in range(num_episodes):
     for t in count():
         # 행동 선택과 수행
         action = select_action(state)
-        next_state, reward, done, _ = env.step(action.item())
+        next_state, reward, done, throughput = env.step(action.item())
 
+        throughputs.append(throughput)
+        if reward > 6.5:
+            reward_count += 1
+            show_actions.append(action)
+            show_next_states.append(next_state)
         rewards.append(reward)
-
         reward = torch.tensor([reward], device=device)
 
+        if i_episode == (num_episodes-1):
+            scatters_tail.append(np.array(next_state))
+        elif i_episode == num_episodes//2:
+            scatters_middle.append(np.array(next_state))
+        elif i_episode == 0:
+            scatters_front.append(np.array(next_state))
         next_state = torch.Tensor(next_state)
         if done:
             next_state = None
@@ -381,15 +398,6 @@ for i_episode in range(num_episodes):
 
         # 다음 상태로 이동
         state = next_state
-
-        if i_episode is (num_episodes-1):
-            print(next_state)
-            scatters_tail.append(np.array(next_state))
-        elif i_episode == 20:
-            scatters_middle.append(np.array(next_state))
-        elif i_episode == 0:
-            scatters_front.append(np.array(next_state))
-
 
         # (정책 네트워크에서) 최적화 한단계 수행
         optimize_model()
@@ -402,25 +410,47 @@ for i_episode in range(num_episodes):
         target_net.load_state_dict(policy_net.state_dict())
 
 print('Complete')
-plt.figure()
-plt.title('reward')
-plt.plot(rewards)
 
-means = []
-for n in range(num_episodes):
-    sum = 0
-    for i in range(env.MAX_STEPS):
-        sum += rewards[n*i]
-    means.append(sum/env.MAX_STEPS)
+def get_mean(array):
+    means = []
+    for n in range(num_episodes):
+        sum = 0
+        for i in range(env.MAX_STEPS):
+            sum += array[n * i]
+        means.append(sum / env.MAX_STEPS)
+    return means
+
+plt.figure()
+plt.title('throughput')
+plt.xlabel('step')
+plt.ylabel('throughput')
+plt.plot(throughputs)
+
+reward_means = get_mean(rewards)
 plt.figure()
 plt.title('reward mean')
-plt.plot(means)
+plt.xlabel('episode')
+plt.ylabel('Reward')
+
+plt.plot(reward_means)
 
 plt.figure()
 plt.title('eps')
+plt.xlabel('step')
+plt.ylabel('Reward')
 plt.plot(epslions)
 
-def create_sphere(cx, cy, cz, r):
+loss_means = get_mean(losses)
+plt.figure()
+plt.title('loss')
+plt.xlabel('episode')
+plt.ylabel('loss')
+plt.plot(loss_means)
+
+for i in range(0,reward_count,1):
+    print(show_actions[i], show_next_states[i])
+
+"""def create_sphere(cx, cy, cz, r):
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
     x = np.cos(u) * np.sin(v)
     y = np.sin(u) * np.sin(v)
@@ -429,7 +459,7 @@ def create_sphere(cx, cy, cz, r):
     x = r * x + cx
     y = r * y + cy
     z = r * z + cz
-    return (x, y, z)
+    return (x, y, z)"""
 
 # 3D 그래프 그리기
 fig = plt.figure()
@@ -446,6 +476,7 @@ nodes = []
 nodes.append(env.source)
 nodes.append(env.dest)
 nodes.append(env.agent2)
+print(scatters_tail)
 """for i in range(0, env.MAX_STEPS//10, 1):
     for j in range(10):
         # 구 그리기
@@ -454,9 +485,9 @@ nodes.append(env.agent2)
         ax.plot_surface(x, y, z, color=color_list[i%6], linewidth=0, alpha=0.1)
         # 점 찍기
         ax.scatter(np.transpose(scatters)[0], np.transpose(scatters)[1], np.transpose(scatters)[2],marker='o', s=60, c=color_list[i])"""
-ax.scatter(np.transpose(scatters_front)[0], np.transpose(scatters_front)[1], np.transpose(scatters_front)[2],marker='o', s=60, c='orange')
-ax.scatter(np.transpose(scatters_middle)[0], np.transpose(scatters_middle)[1], np.transpose(scatters_middle)[2],marker='o', s=60, c='red')
-ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.transpose(scatters_tail)[2],marker='o', s=60, c='purple')
+ax.scatter(np.transpose(scatters_front)[0], np.transpose(scatters_front)[1], np.transpose(scatters_front)[2], marker='o', s=60, c='orange')
+ax.scatter(np.transpose(scatters_middle)[0], np.transpose(scatters_middle)[1], np.transpose(scatters_middle)[2], marker='o', s=60, c='red')
+ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.transpose(scatters_tail)[2], marker='o', s=60, c='purple')
 
 ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 plt.show()

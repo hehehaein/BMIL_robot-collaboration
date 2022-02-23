@@ -72,9 +72,7 @@ class setup :
         nx.draw(graph)
         plt.show()
 
-        #if nx.has_path(graph, total_node-2, total_node-1) :
-            #path_hop = nx.shortest_path_length(graph, total_node-2, total_node-1)
-        if nx.complete_graph(total_node):
+        if nx.has_path(graph, total_node-2, total_node-1) :
             path_hop = total_node-1
         else :
             path_hop = np.inf

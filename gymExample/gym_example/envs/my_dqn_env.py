@@ -39,8 +39,8 @@ class reward_set:
                     graph.add_edge(i, j)
         # nx.draw(graph)
         # plt.show()
-        if nx.complete_graph(self.N+2):
-            path_hop = (self.N+2) - 1
+        if nx.has_path(graph, self.N-2, self.N-1) :
+            path_hop = self.N-1
         else:
             path_hop = np.inf
 
@@ -92,7 +92,7 @@ class reward_set:
 
     def cal_reward(self, throughput, dispersed, foot_of_perpendicular, energy_move, energy_txr):
         u = 7  # constant that guarantees the reward to be non-negative
-        reward = 7 + throughput + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
+        reward = 7 + (throughput * (1 / 6)) + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
         return reward
 
 
@@ -106,7 +106,7 @@ class My_DQN(gym.Env):
     # ~number of relay node
     N = 2
     # ~transmission radius max
-    R_MAX = 5
+    R_MAX = 4
     # location x,y,z
     MIN_LOC = 0
     MAX_LOC = 4
@@ -115,7 +115,7 @@ class My_DQN(gym.Env):
     MIN_HEIGHT = 0
 
     source = np.array((MIN_LOC, MIN_LOC, MIN_HEIGHT, R_MAX))
-    dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, R_MAX))
+    dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
     agent2 = np.array((3, 3, 3, 3))
 
     def __init__(self):
@@ -152,6 +152,8 @@ class My_DQN(gym.Env):
 
         self.state = self.dest.copy()
         self.state[2] = self.MAX_HEIGHT
+        self.state[3] = 0
+        self.throughput = 0
         self.reward = 0
         self.done = False
         self.info = {}
@@ -243,13 +245,14 @@ class My_DQN(gym.Env):
 
             env = reward_set(self.N)
             adj_arr = env.cal_adjacency(next_position_array)
-            throughput = env.cal_throughput(adj_arr)
+            self.throughput = env.cal_throughput(adj_arr)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
             foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0, real_action[3])
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
             # print("%6.3f %6.3f %6.3f %6.3f %3d" %(throughput, dispersed, foot, e_move, e_txr))
-            self.reward = env.cal_reward(throughput, dispersed, foot, e_move, e_txr)
+
+            self.reward = env.cal_reward(self.throughput, dispersed, foot, e_move, e_txr)
 
         try:
             # assert self.observation_space.contains(self.state)
@@ -257,8 +260,7 @@ class My_DQN(gym.Env):
 
         except AssertionError:
             print("INVALID STATE", self.next_state)
-
-        return [self.next_state, self.reward, self.done, self.info]
+        return [self.next_state, self.reward, self.done, self.throughput]
 
     def render (self, state, mode="human"):
         """Renders the environment.
