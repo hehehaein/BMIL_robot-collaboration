@@ -235,12 +235,12 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 128 #128
-num_episodes = 400
-GAMMA = 0.9
+num_episodes = 200
+GAMMA = 0.90
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 1e-4
-TARGET_UPDATE = 10
+EPS_DECAY = 0.0001
+TARGET_UPDATE = 50
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
 # 가져옵니다. 이 시점에 일반적으로 3x40x90 에 가깝습니다.
@@ -256,7 +256,7 @@ target_net = DQN().to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
-optimizer = optim.Adam(policy_net.parameters(),lr=1e-6)
+optimizer = optim.Adam(policy_net.parameters(),lr=1e-4)
 memory = ReplayMemory(300)
 
 
@@ -373,9 +373,10 @@ for i_episode in range(num_episodes):
     for t in count():
         # 행동 선택과 수행
         action = select_action(state)
-        next_state, reward, done, throughput = env.step(action.item())
-
-        throughputs.append(throughput)
+        next_state, reward, done, last_set = env.step(action.item())
+        if i_episode == (num_episodes-1):
+            print("%6.3f %6.3f %6.3f %6.3f %3d" %(last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
+        throughputs.append(last_set[0])
         if reward > 6.5:
             reward_count += 1
             show_actions.append(action)

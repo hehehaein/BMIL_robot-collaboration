@@ -91,8 +91,8 @@ class reward_set:
         return energy_txr
 
     def cal_reward(self, throughput, dispersed, foot_of_perpendicular, energy_move, energy_txr):
-        u = 7  # constant that guarantees the reward to be non-negative
-        reward = 7 + (throughput * (1 / 6)) + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
+        u = 5  # constant that guarantees the reward to be non-negative
+        reward = 5 + (throughput * (1 / 6)) + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
         return reward
 
 
@@ -102,11 +102,11 @@ class My_DQN(gym.Env):
         "render.modes": ["human"]
     }
 
-    MAX_STEPS = 40
+    MAX_STEPS = 60
     # ~number of relay node
     N = 2
     # ~transmission radius max
-    R_MAX = 4
+    R_MAX = 3
     # location x,y,z
     MIN_LOC = 0
     MAX_LOC = 4
@@ -152,8 +152,7 @@ class My_DQN(gym.Env):
 
         self.state = self.dest.copy()
         self.state[2] = self.MAX_HEIGHT
-        self.state[3] = 0
-        self.throughput = 0
+        self.last_set = np.zeros(5)
         self.reward = 0
         self.done = False
         self.info = {}
@@ -251,6 +250,11 @@ class My_DQN(gym.Env):
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
             # print("%6.3f %6.3f %6.3f %6.3f %3d" %(throughput, dispersed, foot, e_move, e_txr))
+            self.last_set[0] = self.throughput/6
+            self.last_set[1] = foot
+            self.last_set[2] = dispersed
+            self.last_set[3] = e_move
+            self.last_set[4] = e_txr
 
             self.reward = env.cal_reward(self.throughput, dispersed, foot, e_move, e_txr)
 
@@ -260,7 +264,7 @@ class My_DQN(gym.Env):
 
         except AssertionError:
             print("INVALID STATE", self.next_state)
-        return [self.next_state, self.reward, self.done, self.throughput]
+        return [self.next_state, self.reward, self.done, self.last_set]
 
     def render (self, state, mode="human"):
         """Renders the environment.
