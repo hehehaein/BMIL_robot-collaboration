@@ -58,6 +58,9 @@ import random
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import networkx as nx
+import time
+
 from collections import namedtuple, deque
 from itertools import count
 from PIL import Image
@@ -74,6 +77,8 @@ import torchvision.transforms as T
 select_env = "dqn-v0"
 register_env(select_env, lambda config: My_DQN())
 env = gym.make(select_env).unwrapped
+
+PATH = './results'
 
 # matplotlib 설정
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -235,12 +240,12 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 128 #128
-num_episodes = 200
-GAMMA = 0.90
+num_episodes = 10000
+GAMMA = 0.98
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.0001
-TARGET_UPDATE = 50
+EPS_DECAY = 0.0000037
+TARGET_UPDATE = 70
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
 # 가져옵니다. 이 시점에 일반적으로 3x40x90 에 가깝습니다.
@@ -256,7 +261,7 @@ target_net = DQN().to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
-optimizer = optim.Adam(policy_net.parameters(),lr=1e-4)
+optimizer = optim.Adam(policy_net.parameters(),lr=1e-5)
 memory = ReplayMemory(300)
 
 
@@ -343,6 +348,7 @@ def optimize_model():
     optimizer.step()
 
 
+
 ######################################################################
 #
 # 아래에서 주요 학습 루프를 찾을 수 있습니다. 처음으로 환경을
@@ -360,10 +366,14 @@ scatters_front = []
 scatters_middle = []
 scatters_tail = []
 
-show_actions = []
+show_state = []
 show_next_states = []
 i_episode = 0
 reward_count = 0
+now = time.localtime()
+str = '{0}_{1}_{2}_{3}_{4}_{5}'.format(
+    now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+print(str)
 for i_episode in range(num_episodes):
     print(i_episode)
     # 환경과 상태 초기화
@@ -375,11 +385,14 @@ for i_episode in range(num_episodes):
         action = select_action(state)
         next_state, reward, done, last_set = env.step(action.item())
         if i_episode == (num_episodes-1):
-            print("%6.3f %6.3f %6.3f %6.3f %3d" %(last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
+
+            print(state, next_state, "%2d%2d%2d%2d %6.3f %6.3f %6.3f %6.3f %3d "
+                  %(last_set[5], last_set[6], last_set[7], last_set[8],
+                    last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
         throughputs.append(last_set[0])
         if reward > 6.5:
             reward_count += 1
-            show_actions.append(action)
+            show_state.append(state)
             show_next_states.append(next_state)
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
@@ -410,6 +423,13 @@ for i_episode in range(num_episodes):
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
+torch.save({
+    'target_net' : target_net.state_dict(),
+    'policy_net' : policy_net.state_dict(),
+    'optimizer' : optimizer.state_dict()
+    }, PATH+str)
+
+
 print('Complete')
 
 def get_mean(array):
@@ -422,17 +442,24 @@ def get_mean(array):
     return means
 
 plt.figure()
-plt.title('throughput')
+plt.title('throughput',num_episodes,'/',env.MAX_STEPS, '/ 5' )
 plt.xlabel('step')
 plt.ylabel('throughput')
 plt.plot(throughputs)
+
+plt.figure()
+plt.title('throughput')
+plt.xlabel('step')
+plt.ylabel('throughput')
+x_values = list(range(throughputs.__len__()))
+y_values = [y for y in throughputs]
+plt.scatter(x_values, y_values, s=40)
 
 reward_means = get_mean(rewards)
 plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
-
 plt.plot(reward_means)
 
 plt.figure()
@@ -448,8 +475,6 @@ plt.xlabel('episode')
 plt.ylabel('loss')
 plt.plot(loss_means)
 
-for i in range(0,reward_count,1):
-    print(show_actions[i], show_next_states[i])
 
 """def create_sphere(cx, cy, cz, r):
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
@@ -477,7 +502,6 @@ nodes = []
 nodes.append(env.source)
 nodes.append(env.dest)
 nodes.append(env.agent2)
-print(scatters_tail)
 """for i in range(0, env.MAX_STEPS//10, 1):
     for j in range(10):
         # 구 그리기

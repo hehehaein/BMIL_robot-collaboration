@@ -92,7 +92,10 @@ class setup :
             if adj_array[i][j] > 0:
                 adj_nodes = adj_nodes + 1
                 now_disperse += adj_array[i][j]
-        return now_disperse / (adj_nodes*my_txr)
+        if adj_nodes == 0:
+            return 0
+        else:
+            return now_disperse / (adj_nodes * my_txr)
 
     def cal_h(self, x, y, z, source, destination):
         kx = destination[0]-source[0]
@@ -137,7 +140,7 @@ if __name__ == '__main__':
     height_min = 1
 
     i = 0 #action
-    move = np.array([-3,-3,-2,0]) #action
+    move = np.array([0,-1,-1,-4]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)
