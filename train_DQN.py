@@ -60,6 +60,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import networkx as nx
 import time
+import os
 
 from collections import namedtuple, deque
 from itertools import count
@@ -67,18 +68,19 @@ from PIL import Image
 from ray.tune.registry import register_env
 from gymExample.gym_example.envs.my_dqn_env import My_DQN
 
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
 
+
+
 select_env = "dqn-v0"
 register_env(select_env, lambda config: My_DQN())
 env = gym.make(select_env).unwrapped
-
-PATH = './results'
+path = os.getcwd()
+PATH = 'C:\\Users\\BMIL16\\results\\'
 
 # matplotlib 설정
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -86,6 +88,8 @@ if is_ipython:
     from IPython import display
 
 plt.ion()
+
+random.seed(1)
 
 # GPU를 사용할 경우
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -115,7 +119,7 @@ Transition = namedtuple('Transition',
 class ReplayMemory(object):
 
     def __init__(self, capacity):
-        self.memory = deque([],maxlen=capacity)
+        self.memory = deque([], maxlen=capacity)
 
     def push(self, *args):
         """transition 저장"""
@@ -199,8 +203,8 @@ class DQN(nn.Module):
 
     def __init__(self):
         super(DQN, self).__init__()
-        self.linear1 = nn.Linear(4, 64)
-        self.linear2 = nn.Linear(64, 64)
+        self.linear1 = nn.Linear(16, 32)
+        self.linear2 = nn.Linear(32, 64)
         self.linear3 = nn.Linear(64, 81)
         """# Linear 입력의 연결 숫자는 conv2d 계층의 출력과 입력 이미지의 크기에
         # 따라 결정되기 때문에 따로 계산을 해야합니다.
@@ -214,8 +218,8 @@ class DQN(nn.Module):
     # 최적화 중에 다음 행동을 결정하기 위해서 하나의 요소 또는 배치를 이용해 호촐됩니다.
     # ([[left0exp,right0exp]...]) 를 반환합니다.
     def forward(self, x):
-        #x = x.to(device)
-        #print('forward\n',x)
+        # x = x.to(device)
+        # print('forward\n',x)
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         return self.linear3(x)
@@ -239,19 +243,19 @@ class DQN(nn.Module):
 #    포함 된 셀 밑에 있으며, 매 에피소드마다 업데이트됩니다.
 #
 
-BATCH_SIZE = 128 #128
-num_episodes = 10000
-GAMMA = 0.98
+BATCH_SIZE = 64  # 128
+num_episodes = 300
+GAMMA = 0.95
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.0000037
+EPS_DECAY = 0.00015
 TARGET_UPDATE = 70
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
 # 가져옵니다. 이 시점에 일반적으로 3x40x90 에 가깝습니다.
 # 이 크기는 get_screen()에서 고정, 축소된 렌더 버퍼의 결과입니다.
-#init_screen = get_screen()
-#_, _, screen_height, screen_width = init_screen.shape
+# init_screen = get_screen()
+# _, _, screen_height, screen_width = init_screen.shape
 
 # gym 행동 공간에서 행동의 숫자를 얻습니다.
 n_actions = env.action_space.n
@@ -261,17 +265,17 @@ target_net = DQN().to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
-optimizer = optim.Adam(policy_net.parameters(),lr=1e-5)
-memory = ReplayMemory(300)
-
+optimizer = optim.Adam(policy_net.parameters(), lr=1e-6)
+memory = ReplayMemory(800)
 
 steps_done = 0
 epslions = []
 
+
 def select_action(state):
     global steps_done
     sample = random.random()
-    eps_threshold = max(EPS_END,EPS_START - (EPS_DECAY * steps_done))
+    eps_threshold = max(EPS_END, EPS_START - (EPS_DECAY * steps_done))
     epslions.append(eps_threshold)
 
     steps_done += 1
@@ -283,6 +287,7 @@ def select_action(state):
             return policy_net(state).max(-1)[1].view(1, 1)
     else:
         return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
+
 
 ######################################################################
 # 학습 루프
@@ -302,6 +307,8 @@ def select_action(state):
 #
 
 losses = []
+
+
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
@@ -313,7 +320,7 @@ def optimize_model():
     # 최종이 아닌 상태의 마스크를 계산하고 배치 요소를 연결합니다
     # (최종 상태는 시뮬레이션이 종료 된 이후의 상태)
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                          batch.next_state)), device=device, dtype=torch.bool)
+                                            batch.next_state)), device=device, dtype=torch.bool)
     for s in batch.next_state:
         if s is not None:
             non_final_next_states = torch.stack(tuple(torch.Tensor(s)))
@@ -348,7 +355,6 @@ def optimize_model():
     optimizer.step()
 
 
-
 ######################################################################
 #
 # 아래에서 주요 학습 루프를 찾을 수 있습니다. 처음으로 환경을
@@ -371,9 +377,9 @@ show_next_states = []
 i_episode = 0
 reward_count = 0
 now = time.localtime()
-str = '{0}_{1}_{2}_{3}_{4}_{5}'.format(
+str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
     now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-print(str)
+os.makedirs(PATH + str)
 for i_episode in range(num_episodes):
     print(i_episode)
     # 환경과 상태 초기화
@@ -384,25 +390,31 @@ for i_episode in range(num_episodes):
         # 행동 선택과 수행
         action = select_action(state)
         next_state, reward, done, last_set = env.step(action.item())
-        if i_episode == (num_episodes-1):
 
-            print(state, next_state, "%2d%2d%2d%2d %6.3f %6.3f %6.3f %6.3f %3d "
-                  %(last_set[5], last_set[6], last_set[7], last_set[8],
-                    last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
+        state_reshape = np.reshape(state, (env.N+2, 4))
+        next_state_reshape = np.reshape(next_state, (env.N+2, 4))
+
+        if i_episode == (num_episodes - 1):
+            print(state_reshape[0], next_state_reshape[0],
+                  "%2d%2d%2d%2d %6.3f %6.3f %6.3f %6.3f %3d"
+                  % (last_set[5], last_set[6], last_set[7], last_set[8],
+                     last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
+
         throughputs.append(last_set[0])
         if reward > 6.5:
             reward_count += 1
-            show_state.append(state)
-            show_next_states.append(next_state)
+            show_state.append(state_reshape[0])
+            show_next_states.append(next_state_reshape[0])
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
-        if i_episode == (num_episodes-1):
-            scatters_tail.append(np.array(next_state))
-        elif i_episode == num_episodes//2:
-            scatters_middle.append(np.array(next_state))
+        if i_episode == (num_episodes - 1):
+            scatters_tail.append(np.array(next_state_reshape[0]))
+        elif i_episode == num_episodes // 2:
+            scatters_middle.append(np.array(next_state_reshape[0]))
         elif i_episode == 0:
-            scatters_front.append(np.array(next_state))
+            scatters_front.append(np.array(next_state_reshape[0]))
+
         next_state = torch.Tensor(next_state)
         if done:
             next_state = None
@@ -416,21 +428,22 @@ for i_episode in range(num_episodes):
         # (정책 네트워크에서) 최적화 한단계 수행
         optimize_model()
         if done:
-            #episode_durations.append(t + 1)
-            #plot_durations()
+            # episode_durations.append(t + 1)
+            # plot_durations()
             break
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
-torch.save({
-    'target_net' : target_net.state_dict(),
-    'policy_net' : policy_net.state_dict(),
-    'optimizer' : optimizer.state_dict()
-    }, PATH+str)
 
+"""torch.save({
+    'target_net': target_net.state_dict(),
+    'policy_net': policy_net.state_dict(),
+    'optimizer': optimizer.state_dict()
+}, PATH)"""
 
 print('Complete')
+
 
 def get_mean(array):
     means = []
@@ -441,26 +454,28 @@ def get_mean(array):
         means.append(sum / env.MAX_STEPS)
     return means
 
-plt.figure()
-plt.title('throughput',num_episodes,'/',env.MAX_STEPS, '/ 5' )
-plt.xlabel('step')
-plt.ylabel('throughput')
-plt.plot(throughputs)
 
 plt.figure()
 plt.title('throughput')
 plt.xlabel('step')
 plt.ylabel('throughput')
+plt.plot(throughputs)
+
+"""plt.figure()
+plt.title('throughput')
+plt.xlabel('step')
+plt.ylabel('throughput')
 x_values = list(range(throughputs.__len__()))
 y_values = [y for y in throughputs]
-plt.scatter(x_values, y_values, s=40)
+plt.scatter(x_values, y_values, s=40)"""
 
-reward_means = get_mean(rewards)
+#reward_means = get_mean(rewards)
+
 plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
-plt.plot(reward_means)
+plt.plot(rewards)
 
 plt.figure()
 plt.title('eps')
@@ -468,13 +483,12 @@ plt.xlabel('step')
 plt.ylabel('Reward')
 plt.plot(epslions)
 
-loss_means = get_mean(losses)
+#loss_means = get_mean(losses)
 plt.figure()
 plt.title('loss')
-plt.xlabel('episode')
+plt.xlabel('step')
 plt.ylabel('loss')
-plt.plot(loss_means)
-
+plt.plot(losses)
 
 """def create_sphere(cx, cy, cz, r):
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
@@ -490,6 +504,7 @@ plt.plot(loss_means)
 # 3D 그래프 그리기
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
+plt.title('position')
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_zlabel('Z')
@@ -510,13 +525,16 @@ nodes.append(env.agent2)
         ax.plot_surface(x, y, z, color=color_list[i%6], linewidth=0, alpha=0.1)
         # 점 찍기
         ax.scatter(np.transpose(scatters)[0], np.transpose(scatters)[1], np.transpose(scatters)[2],marker='o', s=60, c=color_list[i])"""
-ax.scatter(np.transpose(scatters_front)[0], np.transpose(scatters_front)[1], np.transpose(scatters_front)[2], marker='o', s=60, c='orange')
-ax.scatter(np.transpose(scatters_middle)[0], np.transpose(scatters_middle)[1], np.transpose(scatters_middle)[2], marker='o', s=60, c='red')
-ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.transpose(scatters_tail)[2], marker='o', s=60, c='purple')
+ax.scatter(np.transpose(scatters_front)[0], np.transpose(scatters_front)[1], np.transpose(scatters_front)[2],
+           marker='o', s=60, c='orange')
+ax.scatter(np.transpose(scatters_middle)[0], np.transpose(scatters_middle)[1], np.transpose(scatters_middle)[2],
+           marker='o', s=60, c='red')
+ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.transpose(scatters_tail)[2], marker='o',
+           s=60, c='purple')
 
 ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 plt.show()
-#env.render()
+# env.render()
 env.close()
 plt.ioff()
 plt.show()

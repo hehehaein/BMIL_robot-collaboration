@@ -92,7 +92,7 @@ class reward_set:
 
     def cal_reward(self, throughput, dispersed, foot_of_perpendicular, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (5*throughput) + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
+        reward = 5 + (2*throughput) + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
         return reward
 
 
@@ -111,33 +111,34 @@ class My_DQN(gym.Env):
     MIN_LOC = 0
     MAX_LOC = 4
 
-    MAX_HEIGHT = 3
     MIN_HEIGHT = 0
+    MAX_HEIGHT = 3
 
     source = np.array((MIN_LOC, MIN_LOC, MIN_HEIGHT, R_MAX))
     dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
     agent2 = np.array((3, 3, 3, 3))
 
     def __init__(self):
-        """low_range = (MIN_LOC, MIN_LOC, MIN_LOC, 0)
-        high_range = (MAX_LOC, MAX_LOC, MAX_LOC, R_MAX)
+        low_range = (self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0)
+        high_range = (self.MAX_LOC, self.MAX_LOC, self.MAX_LOC, self.R_MAX)
 
-        Low = np.array(low_range * (N + 2))
-        High = np.array(high_range * (N + 2))
+        Low = np.array(low_range * (self.N + 2))
+        High = np.array(high_range * (self.N + 2))
 
-        d = [-1, 0, 1]
+        """d = [-1, 0, 1]
         all_state = []
         for i in range(N + 2):
             all_state.append(d)
         self.state_space = list(product(*all_state))
         num_state_space = len(self.state_space) #81"""
 
-        self.observation_space = gym.spaces.Box(low=np.array([self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0]),
+        # self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3)))
+        # self.action_space = gym.spaces.MultiDiscrete([3,3,3,3])
+        """self.observation_space = gym.spaces.Box(low=np.array([self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0]),
                                                 high=np.array([self.MAX_LOC, self.MAX_LOC, self.MAX_LOC, self.R_MAX]),
-                                                dtype=int)
+                                                dtype=int)"""
 
-        #self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3)))
-        #self.action_space = gym.spaces.MultiDiscrete([3,3,3,3])
+        self.observation_space = gym.spaces.Box(low=Low, high=High, dtype=int)
         self.action_space = gym.spaces.Discrete(81)
 
     def reset(self):
@@ -150,8 +151,18 @@ class My_DQN(gym.Env):
         """
         self.count = 0
 
-        self.state = self.dest.copy()
-        self.state[2] = self.MAX_HEIGHT
+        state_set = np.zeros((self.N+2,4), dtype=int)
+        for i in range(4):
+            state_set[0][i] = self.dest[i] #릴레이노드
+            state_set[1][i] = self.agent2[i]
+            state_set[2][i] = self.source[i]
+            state_set[3][i] = self.dest[i]
+        state_set[0][2]=self.MAX_HEIGHT
+        state_set = state_set.flatten()
+
+        self.state = state_set
+        """self.state = self.dest.copy()
+        self.state[2] = self.MAX_HEIGHT"""
         self.last_set = np.zeros(9)
         self.reward = 0
         self.done = False
@@ -215,38 +226,29 @@ class My_DQN(gym.Env):
             assert self.action_space.contains(action)
             self.count += 1
             real_action = self.translate_action(action)
-            #print(real_action)
             self.next_state = self.state
             # action을 모두 수행
             for i in range(4):
-                self.next_state[i] += (real_action[i] - 1)
+                self.next_state[0+i] += (real_action[i] - 1)
 
             # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
             for i in range(0, 2, 1):  # x,y좌표 이동범위 넘었나 확인
-                if (self.next_state[i] > self.MAX_LOC) or (self.next_state[i] < self.MIN_LOC):
-                    self.next_state[i] -= (real_action[i] - 1)
-            if (self.next_state[2] > self.MAX_HEIGHT) or (self.next_state[2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
-                self.next_state[2] -= (real_action[2] - 1)
-            if (self.next_state[3] > self.R_MAX) or (self.next_state[3] < 0):  # txr 가능범위 넘었나 확인
-                self.next_state[3] -= (real_action[3] - 1)
+                if (self.next_state[0+i] > self.MAX_LOC) or (self.next_state[0+i] < self.MIN_LOC):
+                    self.next_state[0+i] -= (real_action[i] - 1)
+            if (self.next_state[0+2] > self.MAX_HEIGHT) or (self.next_state[0+2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
+                self.next_state[0+2] -= (real_action[2] - 1)
+            if (self.next_state[0+3] > self.R_MAX) or (self.next_state[0+3] < 0):  # txr 가능범위 넘었나 확인
+                self.next_state[0+3] -= (real_action[3] - 1)
 
-            state_position_array = np.zeros((self.N + 2, 4))
-            state_position_array[0] = self.state
-            state_position_array[1] = self.agent2.copy()
-            state_position_array[2] = self.source.copy()
-            state_position_array[3] = self.dest.copy()
+            state_position_array = np.reshape(self.state, (self.N+2, 4))
 
-            next_position_array = np.zeros((self.N + 2, 4))
-            next_position_array[0] = self.next_state
-            next_position_array[1] = self.agent2.copy()
-            next_position_array[2] = self.source.copy()
-            next_position_array[3] = self.dest.copy()
+            next_position_array = np.reshape(self.next_state, (self.N+2, 4))
 
             env = reward_set(self.N)
             adj_arr = env.cal_adjacency(next_position_array)
             self.throughput = env.cal_throughput(adj_arr)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
-            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0, real_action[3])
+            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0, next_position_array[0][3]-state_position_array[0][3])
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
             # print("%6.3f %6.3f %6.3f %6.3f %3d" %(throughput, dispersed, foot, e_move, e_txr))
@@ -261,13 +263,11 @@ class My_DQN(gym.Env):
             self.last_set[8] = real_action[3]-1
 
             self.reward = env.cal_reward(self.throughput, dispersed, foot, e_move, e_txr)
-
         try:
-            # assert self.observation_space.contains(self.state)
             assert self.observation_space.contains(self.next_state)
-
         except AssertionError:
             print("INVALID STATE", self.next_state)
+
         return [self.next_state, self.reward, self.done, self.last_set]
 
     def render (self, state, mode="human"):
