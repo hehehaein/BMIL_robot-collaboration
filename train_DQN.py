@@ -78,7 +78,7 @@ select_env = "dqn-v0"
 register_env(select_env, lambda config: My_DQN())
 env = gym.make(select_env).unwrapped
 path = os.getcwd()
-PATH = 'C:\\Users\\BMIL16\\results\\'
+print(path)
 
 # matplotlib 설정
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -244,12 +244,12 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 64  # 128
-num_episodes = 500
-DISCOUNT_FACTOR = 0.90
+num_episodes = 2000
+DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.000075
-TARGET_UPDATE = 100
+EPS_DECAY = 0.000019
+TARGET_UPDATE = 700
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
 # 가져옵니다. 이 시점에 일반적으로 3x40x90 에 가깝습니다.
@@ -266,7 +266,7 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
 optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
-memory = ReplayMemory(18000)
+memory = ReplayMemory(65000)
 
 steps_done = 0
 epslions = []
@@ -379,7 +379,7 @@ reward_count = 0
 now = time.localtime()
 str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
     now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-os.makedirs(PATH + str)
+os.makedirs(path + '\\' + str)
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
     state = env.reset()
@@ -393,15 +393,14 @@ for i_episode in tqdm(range(num_episodes)):
         state_reshape = np.reshape(state, (env.N+2, 4))
         next_state_reshape = np.reshape(next_state, (env.N+2, 4))
 
-        if i_episode > (num_episodes - 3):
+        if i_episode > (num_episodes - 3) or i_episode == num_episodes//2:
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f dispersed:%6.3f move:%6.3f txr:%3d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
                      last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
 
         throughputs.append(last_set[0])
-        if last_set[0] != 0:
-            print(i_episode, t)
+
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
@@ -432,12 +431,12 @@ for i_episode in tqdm(range(num_episodes)):
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
-
-"""torch.save({
+'''with open(path + '\\')
+torch.save({
     'target_net': target_net.state_dict(),
     'policy_net': policy_net.state_dict(),
     'optimizer': optimizer.state_dict()
-}, PATH)"""
+}, path + '\\' + str)'''
 
 print('Complete')
 

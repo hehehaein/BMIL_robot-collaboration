@@ -69,6 +69,11 @@ class reward_set:
                                              source, destination) \
                                 - state_array[i][3] + next_state_array[i][3]
         return foot_of_perpendicular
+    def cal_foot(self, next_state_array, source, destination, i):
+        foot = next_state_array[i][3] \
+               - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination) \
+
+        return foot
 
     def cal_dispersed(self, i, my_txr, adj_array):
         adj_nodes = 0
@@ -92,7 +97,7 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (throughput) + (3*foot_of_perpendicular) + (dispersed) - energy_move - (energy_txr * (2 / 5))
+        reward = 5 + (throughput) + (foot_of_perpendicular) + (dispersed) - energy_move - (energy_txr * (2 / 5))
         return reward
 
 
@@ -253,7 +258,7 @@ class My_DQN(gym.Env):
             adj_arr = env.cal_adjacency(next_position_array)
             # print("adj_arr",adj_arr)
             self.throughput = env.cal_throughput(adj_arr)
-            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0)
+            foot = env.cal_foot(next_position_array, self.source, self.dest, 0)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
