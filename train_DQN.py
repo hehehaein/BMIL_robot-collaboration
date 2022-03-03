@@ -88,6 +88,8 @@ if is_ipython:
 plt.ion()
 
 random.seed(1)
+np.random.seed(1)
+torch.manual_seed(1)
 
 # GPU를 사용할 경우
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -201,9 +203,9 @@ class DQN(nn.Module):
 
     def __init__(self):
         super(DQN, self).__init__()
-        self.linear1 = nn.Linear(16, 64)
-        self.linear2 = nn.Linear(64, 128)
-        self.linear3 = nn.Linear(128, 625)
+        self.linear1 = nn.Linear(16, 32)
+        self.linear2 = nn.Linear(32, 64)
+        self.linear3 = nn.Linear(64, 81)
         """# Linear 입력의 연결 숫자는 conv2d 계층의 출력과 입력 이미지의 크기에
         # 따라 결정되기 때문에 따로 계산을 해야합니다.
         def conv2d_size_out(size, kernel_size = 5, stride = 2):
@@ -242,11 +244,11 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 64  # 128
-num_episodes = 300
-DISCOUNT_FACTOR = 0.98
+num_episodes = 500
+DISCOUNT_FACTOR = 0.90
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.000042
+EPS_DECAY = 0.000075
 TARGET_UPDATE = 100
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
@@ -264,7 +266,7 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
 optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
-memory = ReplayMemory(800)
+memory = ReplayMemory(18000)
 
 steps_done = 0
 epslions = []
@@ -393,19 +395,17 @@ for i_episode in tqdm(range(num_episodes)):
 
         if i_episode > (num_episodes - 3):
             print(state_reshape[0], next_state_reshape[0],
-                  "%2d%2d%2d%2d %6.3f %6.3f %6.3f %6.3f %3d"
+                  "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f dispersed:%6.3f move:%6.3f txr:%3d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
                      last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
 
         throughputs.append(last_set[0])
-        if reward > 6.5:
-            reward_count += 1
-            show_state.append(state_reshape[0])
-            show_next_states.append(next_state_reshape[0])
+        if last_set[0] != 0:
+            print(i_episode, t)
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
-        if i_episode == (num_episodes - 1):
+        if i_episode > (num_episodes - 3):
             scatters_tail.append(np.array(next_state_reshape[0]))
         elif i_episode == num_episodes // 2:
             scatters_middle.append(np.array(next_state_reshape[0]))

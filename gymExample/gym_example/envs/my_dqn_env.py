@@ -14,7 +14,7 @@ class reward_set:
     def __init__(self, N):
         self.N = N
 
-    #S-D까지 연결되는지 확인하기위해서 인접행렬 만들기
+    # S-D까지 연결되는지 확인하기위해서 인접행렬 만들기
     def cal_adjacency(self, next_state_array):
         adj_array = np.empty((self.N + 2, self.N + 2), float)
         for i in range(0, self.N + 2, 1):
@@ -26,7 +26,7 @@ class reward_set:
                     adj_array[i][j] = distance
                 else:
                     adj_array[i][j] = 0
-        #print('adj\n',adj_array)
+        # print('adj\n',adj_array)
         return adj_array
 
     # 인접그래프 그리기.
@@ -40,8 +40,8 @@ class reward_set:
                 if adj_array[i][j] > 0:
                     graph.add_edge(i, j)
 
-        if nx.has_path(graph, self.N, self.N+1) :
-            path_hop = self.N+1
+        if nx.has_path(graph, self.N, self.N + 1):
+            path_hop = self.N + 1
         else:
             path_hop = np.inf
 
@@ -52,6 +52,23 @@ class reward_set:
             throughput = 0
 
         return throughput
+
+
+    def cal_h(self, x, y, z, source, destination):
+        kx = destination[0] - source[0]
+        ky = destination[1] - source[1]
+        kz = destination[2] - source[2]
+        constant = (((kx * x) + (ky * y) + (kz * z)) / (math.pow(kx, 2) + math.pow(ky, 2) + math.pow(kz, 2)))
+        h = math.sqrt(math.pow(constant * kx - x, 2) + math.pow(constant * ky - y, 2) + math.pow(constant * kz - z, 2))
+        return h
+
+    # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
+    def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i):
+        foot_of_perpendicular = self.cal_h(state_array[i][0], state_array[i][1], state_array[i][2], source, destination) \
+                                - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2],
+                                             source, destination) \
+                                - state_array[i][3] + next_state_array[i][3]
+        return foot_of_perpendicular
 
     def cal_dispersed(self, i, my_txr, adj_array):
         adj_nodes = 0
@@ -65,21 +82,6 @@ class reward_set:
         else:
             return now_disperse / (adj_nodes * my_txr)
 
-    def cal_h(self, x, y, z, source, destination):
-        kx = destination[0] - source[0]
-        ky = destination[1] - source[1]
-        kz = destination[2] - source[2]
-        constant = (((kx * x) + (ky * y) + (kz * z)) / (math.pow(kx, 2) + math.pow(ky, 2) + math.pow(kz, 2)))
-        h = math.sqrt(math.pow(constant * kx - x, 2) + math.pow(constant * ky - y, 2) + math.pow(constant * kz - z, 2))
-        return h
-
-    # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
-    def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i):
-        foot_of_perpendicular = self.cal_h(state_array[i][0], state_array[i][1], state_array[i][2], source, destination) \
-                            - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination) \
-                            - state_array[i][3] + next_state_array[i][3]
-        return foot_of_perpendicular
-
     def cal_used_energy_to_move(self, action):
         energy_move = math.sqrt((math.pow(action[0], 2) + math.pow(action[1], 2) + math.pow(action[2], 2)))
         return energy_move
@@ -90,17 +92,16 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (throughput) + (foot_of_perpendicular) + (2*dispersed) - energy_move - (energy_txr * (2 / 5))
+        reward = 5 + (throughput) + (3*foot_of_perpendicular) + (dispersed) - energy_move - (energy_txr * (2 / 5))
         return reward
 
 
 class My_DQN(gym.Env):
-
     metadata = {
         "render.modes": ["human"]
     }
 
-    MAX_STEPS = 150
+    MAX_STEPS = 50
     # ~number of relay node
     N = 2
     # ~transmission radius max
@@ -109,10 +110,10 @@ class My_DQN(gym.Env):
     MIN_LOC = 0
     MAX_LOC = 4
 
-    MIN_HEIGHT = 0
-    MAX_HEIGHT = 3
+    MIN_HEIGHT = 1
+    MAX_HEIGHT = 4
 
-    source = np.array((MIN_LOC, MIN_LOC, MIN_HEIGHT, R_MAX))
+    source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, R_MAX))
     dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
     agent2 = np.array((3, 3, 3, 3))
 
@@ -137,7 +138,7 @@ class My_DQN(gym.Env):
                                                 dtype=int)"""
 
         self.observation_space = gym.spaces.Box(low=Low, high=High, dtype=int)
-        self.action_space = gym.spaces.Discrete(625)
+        self.action_space = gym.spaces.Discrete(81)
 
     def reset(self):
         """
@@ -149,18 +150,17 @@ class My_DQN(gym.Env):
         """
         self.count = 0
 
-        state_set = np.zeros((self.N+2,4), dtype=int)
+        state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):
-            state_set[0][i] = self.dest[i] #릴레이노드
-            state_set[1][i] = self.agent2[i]
-            state_set[2][i] = self.source[i]
-            state_set[3][i] = self.dest[i]
-        state_set[0][2]=self.MAX_HEIGHT
+            state_set[0][i] = copy.deepcopy(self.dest[i])  # 릴레이노드
+            state_set[1][i] = copy.deepcopy(self.agent2[i])
+            state_set[2][i] = copy.deepcopy(self.source[i])
+            state_set[3][i] = copy.deepcopy(self.dest[i])
+        state_set[0][2] = self.MAX_HEIGHT
+        state_set[0][3] = self.R_MAX
         state_set = state_set.flatten()
 
         self.state = state_set
-        """self.state = self.dest.copy()
-        self.state[2] = self.MAX_HEIGHT"""
         self.last_set = np.zeros(9)
         self.reward = 0
         self.done = False
@@ -168,13 +168,13 @@ class My_DQN(gym.Env):
 
         return self.state
 
-    def translate_action(self,action):
+    def translate_action(self, action):
         array = np.zeros(4, dtype=int)
         for i in range(4):
-            array[i] = action % 5
-            action = action/5
+            array[i] = action % 3
+            action = action / 3
         for i in range(4):
-            array[i] = array[i]
+            array[i] = array[i]-1
         return array
 
     def step(self, action):
@@ -227,41 +227,41 @@ class My_DQN(gym.Env):
             self.next_state = copy.deepcopy(self.state)
             # action을 모두 수행
             for i in range(4):
-                self.next_state[0+i] += (real_action[i] - 2)
+                self.next_state[0 + i] += real_action[i]
+
+            self.last_set[5] = real_action[0]
+            self.last_set[6] = real_action[1]
+            self.last_set[7] = real_action[2]
+            self.last_set[8] = real_action[3]
 
             # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
             for i in range(0, 2, 1):  # x,y좌표 이동범위 넘었나 확인
-                if (self.next_state[0+i] > self.MAX_LOC) or (self.next_state[0+i] < self.MIN_LOC):
-                    self.next_state[0+i] -= (real_action[i] - 2)
-            if (self.next_state[0+2] > self.MAX_HEIGHT) or (self.next_state[0+2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
-                self.next_state[0+2] -= (real_action[2] - 2)
-            if (self.next_state[0+3] > self.R_MAX) or (self.next_state[0+3] < 0):  # txr 가능범위 넘었나 확인
-                self.next_state[0+3] -= (real_action[3] - 2)
+                if (self.next_state[0 + i] < self.MIN_LOC) or (self.MAX_LOC < self.next_state[0 + i]):
+                    self.next_state[0 + i] -= real_action[i]
+                    real_action[i] = 0
+            if (self.next_state[0 + 2] > self.MAX_HEIGHT) or (self.next_state[0 + 2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
+                self.next_state[0 + 2] -= real_action[2]
+                real_action[2] = 0
+            if (self.next_state[0 + 3] > self.R_MAX) or (self.next_state[0 + 3] < 0):  # txr 가능범위 넘었나 확인
+                self.next_state[0 + 3] -= real_action[3]
+                real_action[3] = 0
 
-            state_position_array = np.reshape(self.state, (self.N+2, 4))
+            state_position_array = np.reshape(self.state, (self.N + 2, 4))
 
-            next_position_array = np.reshape(self.next_state, (self.N+2, 4))
-            #print("state_position_array",state_position_array)
-            #print("next_position_array",next_position_array)
+            next_position_array = np.reshape(self.next_state, (self.N + 2, 4))
             env = reward_set(self.N)
             adj_arr = env.cal_adjacency(next_position_array)
-            #print("adj_arr",adj_arr)
+            # print("adj_arr",adj_arr)
             self.throughput = env.cal_throughput(adj_arr)
             foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
             self.last_set[0] = self.throughput
-            #print("foot",foot)
             self.last_set[1] = foot
-            #print("dispersed",dispersed)
             self.last_set[2] = dispersed
             self.last_set[3] = e_move
             self.last_set[4] = e_txr
-            self.last_set[5] = real_action[0]-2
-            self.last_set[6] = real_action[1]-2
-            self.last_set[7] = real_action[2]-2
-            self.last_set[8] = real_action[3]-2
 
             self.reward = env.cal_reward(self.throughput, foot, dispersed, e_move, e_txr)
         try:
@@ -269,9 +269,11 @@ class My_DQN(gym.Env):
         except AssertionError:
             print("INVALID STATE", self.next_state)
 
+        self.state = self.next_state
+
         return [self.next_state, self.reward, self.done, self.last_set]
 
-    def render (self, state, mode="human"):
+    def render(self, state, mode="human"):
         """Renders the environment.
 
         The set of supported modes varies per environment. (And some
@@ -295,11 +297,10 @@ class My_DQN(gym.Env):
         Args:
             mode (str): the mode to render with
         """
-        #s = "position: {:2d}  reward: {:2d}  info: {}"
-        #print(s.format(self.state, self.reward, self.info))
+        # s = "position: {:2d}  reward: {:2d}  info: {}"
+        # print(s.format(self.state, self.reward, self.info))
 
-
-    def seed (self, seed=None):
+    def seed(self, seed=None):
         """Sets the seed for this env's random number generator(s).
 
         Note:
@@ -317,8 +318,7 @@ class My_DQN(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-
-    def close (self):
+    def close(self):
         """Override close in your subclass to perform any necessary cleanup.
         Environments will automatically close() themselves when
         garbage collected or when the program exits.
