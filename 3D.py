@@ -24,7 +24,7 @@ MAX_LOCATION = 4  #max location
 class setup :
     def __init__(self, source, destination) :
         self.state_array = np.empty((total_node, 4), int) #source, destination
-        self.state_array[0, :] = [4, 4, 4, 3]
+        self.state_array[0, :] = [1, 2, 0, 3]
         self.state_array[1, :] = [3, 3, 3, 3]
         """for i in range (0,total_node-2,1) :
             self.state_array[i+2,:]= destination[:]"""
@@ -108,7 +108,9 @@ class setup :
 
     #(시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
     def cal_foot_of_perpendicular(self, next_state_array, source, destination, i, move):
-        foot_of_perpendicular = self.cal_h(self.state_array[i][0], self.state_array[i][1], self.state_array[i][2], source, destination) - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination) - move[3]
+        foot_of_perpendicular = self.cal_h(self.state_array[i][0], self.state_array[i][1], self.state_array[i][2], source, destination)\
+                                - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination)\
+                                - move[3]
         return foot_of_perpendicular
 
     def cal_used_energy_to_move(self,move):
@@ -140,7 +142,7 @@ if __name__ == '__main__':
     height_min = 1
 
     i = 0 #action
-    move = np.array([0,-1,-1,-4]) #action
+    move = np.array([-1,-1,0,1]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)

@@ -75,11 +75,11 @@ class reward_set:
         return h
 
     # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
-    def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i, my_txr):
+    def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i):
 
         foot_of_perpendicular = self.cal_h(state_array[i][0], state_array[i][1], state_array[i][2], source, destination) \
                             - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination) \
-                            - my_txr
+                            - state_array[0][3] + next_state_array[0][3]
         return foot_of_perpendicular
 
     def cal_used_energy_to_move(self, action):
@@ -246,7 +246,7 @@ class My_DQN2(gym.Env):
             adj_arr = env.cal_adjacency(next_position_array)
             self.throughput = env.cal_throughput(adj_arr)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
-            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0, real_action[3])
+            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0)
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
             # print("%6.3f %6.3f %6.3f %6.3f %3d" %(throughput, dispersed, foot, e_move, e_txr))

@@ -53,7 +53,6 @@ PyTorch를 사용하는 방법을 보여드립니다.
 """
 
 import gym
-import math
 import random
 import numpy as np
 import matplotlib
@@ -64,7 +63,6 @@ import os
 
 from collections import namedtuple, deque
 from itertools import count
-from PIL import Image
 from ray.tune.registry import register_env
 from gymExample.gym_example.envs.my_dqn_env import My_DQN
 
@@ -72,8 +70,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import torchvision.transforms as T
 
+from tqdm import tqdm
 
 
 select_env = "dqn-v0"
@@ -92,8 +90,8 @@ plt.ion()
 random.seed(1)
 
 # GPU를 사용할 경우
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 ######################################################################
 # 재현 메모리(Replay Memory)
 # -------------------------------
@@ -203,9 +201,9 @@ class DQN(nn.Module):
 
     def __init__(self):
         super(DQN, self).__init__()
-        self.linear1 = nn.Linear(16, 32)
-        self.linear2 = nn.Linear(32, 64)
-        self.linear3 = nn.Linear(64, 81)
+        self.linear1 = nn.Linear(16, 64)
+        self.linear2 = nn.Linear(64, 128)
+        self.linear3 = nn.Linear(128, 625)
         """# Linear 입력의 연결 숫자는 conv2d 계층의 출력과 입력 이미지의 크기에
         # 따라 결정되기 때문에 따로 계산을 해야합니다.
         def conv2d_size_out(size, kernel_size = 5, stride = 2):
@@ -245,11 +243,11 @@ class DQN(nn.Module):
 
 BATCH_SIZE = 64  # 128
 num_episodes = 300
-GAMMA = 0.95
+DISCOUNT_FACTOR = 0.98
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.00015
-TARGET_UPDATE = 70
+EPS_DECAY = 0.000042
+TARGET_UPDATE = 100
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
 # 가져옵니다. 이 시점에 일반적으로 3x40x90 에 가깝습니다.
@@ -265,7 +263,7 @@ target_net = DQN().to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-6)
+optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
 memory = ReplayMemory(800)
 
 steps_done = 0
@@ -340,7 +338,7 @@ def optimize_model():
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
     next_state_values[non_final_mask] = target_net(non_final_next_states).max(-1)[0].detach()
     # 기대 Q 값 계산
-    expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+    expected_state_action_values = (next_state_values * DISCOUNT_FACTOR) + reward_batch
 
     # Huber 손실 계산
     criterion = nn.SmoothL1Loss()
@@ -380,8 +378,7 @@ now = time.localtime()
 str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
     now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
 os.makedirs(PATH + str)
-for i_episode in range(num_episodes):
-    print(i_episode)
+for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
     state = env.reset()
     state = torch.Tensor(state)
@@ -394,7 +391,7 @@ for i_episode in range(num_episodes):
         state_reshape = np.reshape(state, (env.N+2, 4))
         next_state_reshape = np.reshape(next_state, (env.N+2, 4))
 
-        if i_episode == (num_episodes - 1):
+        if i_episode > (num_episodes - 3):
             print(state_reshape[0], next_state_reshape[0],
                   "%2d%2d%2d%2d %6.3f %6.3f %6.3f %6.3f %3d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
@@ -447,10 +444,11 @@ print('Complete')
 
 def get_mean(array):
     means = []
+    sum = 0
     for n in range(num_episodes):
         sum = 0
         for i in range(env.MAX_STEPS):
-            sum += array[n * i]
+            sum += array[(n*env.MAX_STEPS)+i]
         means.append(sum / env.MAX_STEPS)
     return means
 
@@ -469,13 +467,18 @@ x_values = list(range(throughputs.__len__()))
 y_values = [y for y in throughputs]
 plt.scatter(x_values, y_values, s=40)"""
 
-#reward_means = get_mean(rewards)
+plt.figure()
+plt.title('reward')
+plt.xlabel('step')
+plt.ylabel('Reward')
+plt.plot(rewards)
 
+reward_means = get_mean(rewards)
 plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
-plt.plot(rewards)
+plt.plot(reward_means)
 
 plt.figure()
 plt.title('eps')
@@ -483,12 +486,12 @@ plt.xlabel('step')
 plt.ylabel('Reward')
 plt.plot(epslions)
 
-#loss_means = get_mean(losses)
+loss_means = get_mean(losses)
 plt.figure()
 plt.title('loss')
-plt.xlabel('step')
+plt.xlabel('episode')
 plt.ylabel('loss')
-plt.plot(losses)
+plt.plot(loss_means)
 
 """def create_sphere(cx, cy, cz, r):
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]

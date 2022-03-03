@@ -1,3 +1,4 @@
+import copy
 from itertools import product
 
 import gym
@@ -59,7 +60,6 @@ class reward_set:
             if adj_array[i][j] > 0:
                 adj_nodes += 1
                 now_disperse += adj_array[i][j]
-        # print('@@ : ',my_txr[i][3])
         if adj_nodes == 0:
             return 0
         else:
@@ -71,15 +71,13 @@ class reward_set:
         kz = destination[2] - source[2]
         constant = (((kx * x) + (ky * y) + (kz * z)) / (math.pow(kx, 2) + math.pow(ky, 2) + math.pow(kz, 2)))
         h = math.sqrt(math.pow(constant * kx - x, 2) + math.pow(constant * ky - y, 2) + math.pow(constant * kz - z, 2))
-        # print("h",h)
         return h
 
     # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
-    def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i, my_txr):
-
+    def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i):
         foot_of_perpendicular = self.cal_h(state_array[i][0], state_array[i][1], state_array[i][2], source, destination) \
                             - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination) \
-                            - my_txr
+                            - state_array[i][3] + next_state_array[i][3]
         return foot_of_perpendicular
 
     def cal_used_energy_to_move(self, action):
@@ -90,9 +88,9 @@ class reward_set:
         energy_txr = my_txr
         return energy_txr
 
-    def cal_reward(self, throughput, dispersed, foot_of_perpendicular, energy_move, energy_txr):
+    def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (2*throughput) + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
+        reward = 5 + (throughput) + (foot_of_perpendicular) + (2*dispersed) - energy_move - (energy_txr * (2 / 5))
         return reward
 
 
@@ -102,7 +100,7 @@ class My_DQN(gym.Env):
         "render.modes": ["human"]
     }
 
-    MAX_STEPS = 50
+    MAX_STEPS = 150
     # ~number of relay node
     N = 2
     # ~transmission radius max
@@ -139,7 +137,7 @@ class My_DQN(gym.Env):
                                                 dtype=int)"""
 
         self.observation_space = gym.spaces.Box(low=Low, high=High, dtype=int)
-        self.action_space = gym.spaces.Discrete(81)
+        self.action_space = gym.spaces.Discrete(625)
 
     def reset(self):
         """
@@ -173,8 +171,8 @@ class My_DQN(gym.Env):
     def translate_action(self,action):
         array = np.zeros(4, dtype=int)
         for i in range(4):
-            array[i] = action % 3
-            action = action/3
+            array[i] = action % 5
+            action = action/5
         for i in range(4):
             array[i] = array[i]
         return array
@@ -226,43 +224,46 @@ class My_DQN(gym.Env):
             assert self.action_space.contains(action)
             self.count += 1
             real_action = self.translate_action(action)
-            self.next_state = self.state
+            self.next_state = copy.deepcopy(self.state)
             # action을 모두 수행
             for i in range(4):
-                self.next_state[0+i] += (real_action[i] - 1)
+                self.next_state[0+i] += (real_action[i] - 2)
 
             # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
             for i in range(0, 2, 1):  # x,y좌표 이동범위 넘었나 확인
                 if (self.next_state[0+i] > self.MAX_LOC) or (self.next_state[0+i] < self.MIN_LOC):
-                    self.next_state[0+i] -= (real_action[i] - 1)
+                    self.next_state[0+i] -= (real_action[i] - 2)
             if (self.next_state[0+2] > self.MAX_HEIGHT) or (self.next_state[0+2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
-                self.next_state[0+2] -= (real_action[2] - 1)
+                self.next_state[0+2] -= (real_action[2] - 2)
             if (self.next_state[0+3] > self.R_MAX) or (self.next_state[0+3] < 0):  # txr 가능범위 넘었나 확인
-                self.next_state[0+3] -= (real_action[3] - 1)
+                self.next_state[0+3] -= (real_action[3] - 2)
 
             state_position_array = np.reshape(self.state, (self.N+2, 4))
 
             next_position_array = np.reshape(self.next_state, (self.N+2, 4))
-
+            #print("state_position_array",state_position_array)
+            #print("next_position_array",next_position_array)
             env = reward_set(self.N)
             adj_arr = env.cal_adjacency(next_position_array)
+            #print("adj_arr",adj_arr)
             self.throughput = env.cal_throughput(adj_arr)
+            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
-            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0, next_position_array[0][3]-state_position_array[0][3])
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
-            # print("%6.3f %6.3f %6.3f %6.3f %3d" %(throughput, dispersed, foot, e_move, e_txr))
             self.last_set[0] = self.throughput
+            #print("foot",foot)
             self.last_set[1] = foot
+            #print("dispersed",dispersed)
             self.last_set[2] = dispersed
             self.last_set[3] = e_move
             self.last_set[4] = e_txr
-            self.last_set[5] = real_action[0]-1
-            self.last_set[6] = real_action[1]-1
-            self.last_set[7] = real_action[2]-1
-            self.last_set[8] = real_action[3]-1
+            self.last_set[5] = real_action[0]-2
+            self.last_set[6] = real_action[1]-2
+            self.last_set[7] = real_action[2]-2
+            self.last_set[8] = real_action[3]-2
 
-            self.reward = env.cal_reward(self.throughput, dispersed, foot, e_move, e_txr)
+            self.reward = env.cal_reward(self.throughput, foot, dispersed, e_move, e_txr)
         try:
             assert self.observation_space.contains(self.next_state)
         except AssertionError:
