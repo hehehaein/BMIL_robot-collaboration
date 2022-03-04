@@ -44,6 +44,7 @@ xs = []
 ys = []
 zs = []
 alphas = []
+color_list = ("bisque", "navajowhite", "orange", "darkorange", "darkgoldenrod", "olive", "olivedrab","darkgreen","darklategray","blue")
 for x in range(0,5,1):
     for y in range(0,5,1):
         for z in range(0,5,1):
@@ -59,10 +60,17 @@ for x in range(0,5,1):
                 dispersed = env.cal_dispersed(0, state[0][3], adj_array)
                 reward = throughput+foot+dispersed
                 print(state[0], 'throughput=',throughput,'foot=',foot,'dispersed=',dispersed, 'reward=', reward)
-                reward_save = reward/100
-                if reward_save < 0: reward_save = 0
-                if reward_save > 1: reward_save = 1
-                alphas.append(reward_save)
+                if reward > -3 : alphas.append(color_list[0])
+                elif reward > -2 : alphas.append(color_list[1])
+                elif reward > -1: alphas.append(color_list[2])
+                elif reward > 0: alphas.append(color_list[3])
+                elif reward > 1: alphas.append(color_list[4])
+                elif reward > 2: alphas.append(color_list[5])
+                elif reward > 3: alphas.append(color_list[6])
+                elif reward > 4: alphas.append(color_list[7])
+                elif reward > 5: alphas.append(color_list[8])
 
-ax.scatter(xs, ys, zs, marker='o', s=100, c='orange', alpha=alphas)
+
+ax.scatter(xs, ys, zs, marker='o', s=100, c=alphas, alpha=0.8)
+plt.show()
 
