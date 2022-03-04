@@ -20,6 +20,7 @@ reward : throughput + 수선의 발 길이의 차 - node 이동거리 - transmis
 #source, n1, n2, destination
 total_node = 4
 MAX_LOCATION = 4  #max location
+N=2
 
 class setup :
     def __init__(self, source, destination) :
@@ -62,25 +63,35 @@ class setup :
     #인접그래프 그리기.
     #S-D까지의 경로가 있나 확인 -> 홉의 개수(has_path최단거리)찾기 -> throughput 구하기
     def cal_throughput(self, adj_array):
+        tmp_array = np.zeros((N + 2, 4))
+        tmp2_array = np.zeros((N+2,4))
+        tmp_array[0] = adj_array[2]
+        tmp_array[1] = adj_array[0]
+        tmp_array[2] = adj_array[1]
+        tmp_array[3] = adj_array[3]
+        tmp_array=np.transpose(tmp_array)
+        tmp2_array[0] = tmp_array[2]
+        tmp2_array[1] = tmp_array[0]
+        tmp2_array[2] = tmp_array[1]
+        tmp2_array[3] = tmp_array[3]
+        tmp2_array=np.transpose(tmp2_array)
         graph = nx.Graph()
-        for i in range(0,total_node,1):
+        for i in range(0, N + 2, 1):
             graph.add_node(i)
-        for i in range(0, total_node, 1) :
-            for j in range (0, total_node, 1):
-                if adj_array[i][j] > 0 :
-                    graph.add_edge(i,j)
-        nx.draw(graph)
-        plt.show()
+        for i in range(0, N + 2, 1):
+            for j in range(i, N + 2, 1):
+                if 0 < tmp2_array[i][j]:
+                    graph.add_edge(i, j)
 
-        if nx.has_path(graph, total_node-2, total_node-1) :
-            path_hop = total_node-1
-        else :
+        if nx.has_path(graph, 0, N + 1):
+            path_hop = N + 1
+        else:
             path_hop = np.inf
-
-        print("path_hop : ",path_hop)
+        print('tmp_array\n', tmp2_array)
+        # print("path_hop : ",path_hop)
         if path_hop != np.inf:
-            throughput = 20/path_hop
-        else :
+            throughput = 20 / path_hop
+        else:
             throughput = 0
 
         return throughput
@@ -142,7 +153,7 @@ if __name__ == '__main__':
     height_min = 1
 
     i = 0 #action
-    move = np.array([-1,-1,0,1]) #action
+    move = np.array([0,0,1,-1]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)

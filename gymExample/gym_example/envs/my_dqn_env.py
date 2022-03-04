@@ -32,19 +32,31 @@ class reward_set:
     # 인접그래프 그리기.
     # S-D까지의 경로가 있나 확인 -> 홉의 개수(has_path최단거리)찾기 -> throughput 구하기
     def cal_throughput(self, adj_array):
+        tmp_array = np.zeros((self.N + 2, 4))
+        tmp2_array = np.zeros((self.N + 2, 4))
+        tmp_array[0] = adj_array[2]
+        tmp_array[1] = adj_array[0]
+        tmp_array[2] = adj_array[1]
+        tmp_array[3] = adj_array[3]
+        tmp_array = np.transpose(tmp_array)
+        tmp2_array[0] = tmp_array[2]
+        tmp2_array[1] = tmp_array[0]
+        tmp2_array[2] = tmp_array[1]
+        tmp2_array[3] = tmp_array[3]
+        tmp2_array = np.transpose(tmp2_array)
         graph = nx.Graph()
         for i in range(0, self.N + 2, 1):
             graph.add_node(i)
         for i in range(0, self.N + 2, 1):
-            for j in range(0, self.N + 2, 1):
-                if adj_array[i][j] > 0:
+            for j in range(i, self.N + 2, 1):
+                if 0 < tmp2_array[i][j]:
                     graph.add_edge(i, j)
 
-        if nx.has_path(graph, self.N, self.N + 1):
+        if nx.has_path(graph, 0, self.N + 1):
             path_hop = self.N + 1
         else:
             path_hop = np.inf
-
+        #print('tmp_array\n', tmp2_array)
         # print("path_hop : ",path_hop)
         if path_hop != np.inf:
             throughput = 20 / path_hop
@@ -97,7 +109,7 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (throughput) + (foot_of_perpendicular) + (dispersed) - energy_move - (energy_txr * (2 / 5))
+        reward = 5 + (throughput) + (0.5*foot_of_perpendicular) + (dispersed) - energy_move - (energy_txr * (2 / 5))
         return reward
 
 
@@ -254,9 +266,10 @@ class My_DQN(gym.Env):
             state_position_array = np.reshape(self.state, (self.N + 2, 4))
 
             next_position_array = np.reshape(self.next_state, (self.N + 2, 4))
+            #print('next_position_array\n', next_position_array)
             env = reward_set(self.N)
             adj_arr = env.cal_adjacency(next_position_array)
-            # print("adj_arr",adj_arr)
+            #print("adj_arr",adj_arr)
             self.throughput = env.cal_throughput(adj_arr)
             foot = env.cal_foot(next_position_array, self.source, self.dest, 0)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)

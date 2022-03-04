@@ -380,10 +380,12 @@ now = time.localtime()
 str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
     now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
 os.makedirs(path + '\\' + str)
+
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
     state = env.reset()
     state = torch.Tensor(state)
+    throughput_count=0
     # print('state type : ',state.type())
     for t in count():
         # 행동 선택과 수행
@@ -399,7 +401,8 @@ for i_episode in tqdm(range(num_episodes)):
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
                      last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
 
-        throughputs.append(last_set[0])
+        if last_set[0] != 0:
+            throughput_count += 1
 
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
@@ -431,6 +434,8 @@ for i_episode in tqdm(range(num_episodes)):
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
+    throughputs.append(throughput_count)
+
 '''with open(path + '\\')
 torch.save({
     'target_net': target_net.state_dict(),
@@ -454,8 +459,8 @@ def get_mean(array):
 
 plt.figure()
 plt.title('throughput')
-plt.xlabel('step')
-plt.ylabel('throughput')
+plt.xlabel('episode')
+plt.ylabel('throughput_count')
 plt.plot(throughputs)
 
 """plt.figure()
@@ -482,7 +487,7 @@ plt.plot(reward_means)
 plt.figure()
 plt.title('eps')
 plt.xlabel('step')
-plt.ylabel('Reward')
+plt.ylabel('epsilon')
 plt.plot(epslions)
 
 loss_means = get_mean(losses)
