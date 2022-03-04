@@ -244,7 +244,7 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 64  # 128
-num_episodes = 2000
+num_episodes = 1500
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.05
@@ -403,6 +403,7 @@ for i_episode in tqdm(range(num_episodes)):
 
         if last_set[0] != 0:
             throughput_count += 1
+
 
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
