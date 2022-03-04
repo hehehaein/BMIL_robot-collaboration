@@ -60,17 +60,16 @@ for x in range(0,5,1):
                 dispersed = env.cal_dispersed(0, state[0][3], adj_array)
                 reward = throughput+foot+dispersed
                 print(state[0], 'throughput=',throughput,'foot=',foot,'dispersed=',dispersed, 'reward=', reward)
-                if reward > -3 : alphas.append(color_list[0])
-                elif reward > -2 : alphas.append(color_list[1])
-                elif reward > -1: alphas.append(color_list[2])
-                elif reward > 0: alphas.append(color_list[3])
-                elif reward > 1: alphas.append(color_list[4])
-                elif reward > 2: alphas.append(color_list[5])
-                elif reward > 3: alphas.append(color_list[6])
-                elif reward > 4: alphas.append(color_list[7])
-                elif reward > 5: alphas.append(color_list[8])
-
-
-ax.scatter(xs, ys, zs, marker='o', s=100, c=alphas, alpha=0.8)
+                if reward <= -3 : color = color_list[0]
+                elif reward > -3 : color = color_list[1]
+                elif reward > -2 : color = color_list[2]
+                elif reward > -1: color = color_list[3]
+                elif reward > 0: color = color_list[4]
+                elif reward > 1: color = color_list[5]
+                elif reward > 2: color = color_list[6]
+                elif reward > 3: color = color_list[7]
+                elif reward > 4: color = color_list[8]
+                elif reward > 5: color = color_list[9]
+                ax.scatter(x,y,z,marker='o', s=100, c=color, alpha=0.8)
 plt.show()
 
