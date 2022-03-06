@@ -100,18 +100,17 @@ class reward_set:
             return now_disperse / (adj_nodes * my_txr)
 
     def cal_used_energy_to_move(self, action):
-        energy_move = 11.2*(0.5*(action[0]+action[1])+action[2])
+        energy_move = 11.2*(0.5*(abs(action[0])+abs(action[1]))+abs(action[2]))
         return energy_move
 
     def cal_used_energy_to_keep_txr(self, my_txr):
-        energy_txr = my_txr
+        energy_txr = math.pow(my_txr,2)
         return energy_txr
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr / 4)
+        reward = u + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr / 3)
         return reward
-
 
 class My_DQN(gym.Env):
     metadata = {
@@ -122,7 +121,7 @@ class My_DQN(gym.Env):
     # ~number of relay node
     N = 2
     # ~transmission radius max
-    R_MAX = 4
+    R_MAX = 3
     # location x,y,z
     MIN_LOC = 0
     MAX_LOC = 4
@@ -246,11 +245,6 @@ class My_DQN(gym.Env):
             for i in range(4):
                 self.next_state[0 + i] += real_action[i]
 
-            self.last_set[5] = real_action[0]
-            self.last_set[6] = real_action[1]
-            self.last_set[7] = real_action[2]
-            self.last_set[8] = real_action[3]
-
             # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
             for i in range(0, 2, 1):  # x,y좌표 이동범위 넘었나 확인
                 if (self.next_state[0 + i] < self.MIN_LOC) or (self.MAX_LOC < self.next_state[0 + i]):
@@ -262,6 +256,11 @@ class My_DQN(gym.Env):
             if (self.next_state[0 + 3] > self.R_MAX) or (self.next_state[0 + 3] < 0):  # txr 가능범위 넘었나 확인
                 self.next_state[0 + 3] -= real_action[3]
                 real_action[3] = 0
+
+            self.last_set[5] = real_action[0]
+            self.last_set[6] = real_action[1]
+            self.last_set[7] = real_action[2]
+            self.last_set[8] = real_action[3]
 
             state_position_array = np.reshape(self.state, (self.N + 2, 4))
 
@@ -275,6 +274,7 @@ class My_DQN(gym.Env):
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
             e_move = env.cal_used_energy_to_move(real_action)
             e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
+
             self.last_set[0] = self.throughput
             self.last_set[1] = foot
             self.last_set[2] = dispersed

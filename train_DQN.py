@@ -87,9 +87,10 @@ if is_ipython:
 
 plt.ion()
 
-random.seed(1)
-np.random.seed(1)
-torch.manual_seed(1)
+seed = 3
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
 
 # GPU를 사용할 경우
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -244,11 +245,11 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 32
-num_episodes = 8000
+num_episodes = 10000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.0000117
+EPS_DECAY = 0.0000094
 TARGET_UPDATE = 1
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
@@ -379,7 +380,7 @@ reward_count = 0
 now = time.localtime()
 str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
     now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-os.makedirs(path + '\\' + str)
+#os.makedirs(path + '\\' + str)
 
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
@@ -390,6 +391,7 @@ for i_episode in tqdm(range(num_episodes)):
     for t in count():
         # 행동 선택과 수행
         action = select_action(state)
+        time.sleep(0.05)
         next_state, reward, done, last_set = env.step(action.item())
 
         state_reshape = np.reshape(state, (env.N+2, 4))
@@ -408,7 +410,7 @@ for i_episode in tqdm(range(num_episodes)):
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
-        if i_episode > (num_episodes - 3):
+        if i_episode == (num_episodes - 1):
             scatters_tail.append(np.array(next_state_reshape[0]))
         elif i_episode == num_episodes // 2:
             scatters_middle.append(np.array(next_state_reshape[0]))
