@@ -25,8 +25,8 @@ N=2
 class setup :
     def __init__(self, source, destination) :
         self.state_array = np.empty((total_node, 4), int) #source, destination
-        self.state_array[0, :] = [1, 2, 0, 3]
-        self.state_array[1, :] = [3, 3, 3, 3]
+        self.state_array[0, :] = [0, 0, 0, 3]
+        self.state_array[1, :] = [2, 3, 3, 3]
         """for i in range (0,total_node-2,1) :
             self.state_array[i+2,:]= destination[:]"""
         self.state_array[2, :] = source[:]
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     height_min = 1
 
     i = 0 #action
-    move = np.array([0,0,1,-1]) #action
+    move = np.array([1,1,1,0]) #action
 
     env = setup(source, destination)
     next_arr = env.do_action(i, move)

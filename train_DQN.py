@@ -243,13 +243,13 @@ class DQN(nn.Module):
 #    포함 된 셀 밑에 있으며, 매 에피소드마다 업데이트됩니다.
 #
 
-BATCH_SIZE = 64  # 128
-num_episodes = 1500
+BATCH_SIZE = 32
+num_episodes = 8000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.000019
-TARGET_UPDATE = 700
+EPS_DECAY = 0.0000117
+TARGET_UPDATE = 1
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
 # 가져옵니다. 이 시점에 일반적으로 3x40x90 에 가깝습니다.
@@ -266,7 +266,7 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
 optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
-memory = ReplayMemory(65000)
+memory = ReplayMemory(100000)
 
 steps_done = 0
 epslions = []

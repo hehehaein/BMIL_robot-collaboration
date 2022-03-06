@@ -100,7 +100,7 @@ class reward_set:
             return now_disperse / (adj_nodes * my_txr)
 
     def cal_used_energy_to_move(self, action):
-        energy_move = math.sqrt((math.pow(action[0], 2) + math.pow(action[1], 2) + math.pow(action[2], 2)))
+        energy_move = 11.2*(0.5*(action[0]+action[1])+action[2])
         return energy_move
 
     def cal_used_energy_to_keep_txr(self, my_txr):
@@ -109,7 +109,7 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (throughput) + (0.5*foot_of_perpendicular) + (dispersed) - energy_move - (energy_txr * (2 / 5))
+        reward = 5 + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr / 4)
         return reward
 
 
@@ -118,11 +118,11 @@ class My_DQN(gym.Env):
         "render.modes": ["human"]
     }
 
-    MAX_STEPS = 50
+    MAX_STEPS = 20
     # ~number of relay node
     N = 2
     # ~transmission radius max
-    R_MAX = 3
+    R_MAX = 4
     # location x,y,z
     MIN_LOC = 0
     MAX_LOC = 4
@@ -132,7 +132,7 @@ class My_DQN(gym.Env):
 
     source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, R_MAX))
     dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
-    agent2 = np.array((3, 3, 3, 3))
+    agent2 = np.array((2,3,3,3))
 
     def __init__(self):
         low_range = (self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0)
@@ -173,8 +173,8 @@ class My_DQN(gym.Env):
             state_set[1][i] = copy.deepcopy(self.agent2[i])
             state_set[2][i] = copy.deepcopy(self.source[i])
             state_set[3][i] = copy.deepcopy(self.dest[i])
-        state_set[0][2] = self.MAX_HEIGHT
-        state_set[0][3] = self.R_MAX
+        state_set[0][2] = self.MIN_HEIGHT
+        state_set[0][3] = 2
         state_set = state_set.flatten()
 
         self.state = state_set

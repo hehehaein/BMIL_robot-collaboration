@@ -16,5 +16,5 @@ source = np.array((0,0,0,4))
 des = np.array((4,4,4,0))
 action = np.array((-1,0,0,-1))
 
-print(cal_h(4,0,3,source,des))
+print(cal_h(2,3,3,source,des))
 
