@@ -93,10 +93,7 @@ torch.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 os.environ["PYTHONHASHSEED"]=str(seed)
 
-now = time.localtime()
-str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
-    now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-path = os.path.join(os.getcwd(), 'results')
+
 
 # GPU를 사용할 경우
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -249,14 +246,20 @@ class DQN(nn.Module):
 #    에피소드의 지속을 도표로 그리기 위한 헬퍼. 도표는 기본 훈련 루프가
 #    포함 된 셀 밑에 있으며, 매 에피소드마다 업데이트됩니다.
 #
-
 BATCH_SIZE = 32
-num_episodes = 4000
+num_episodes = 8000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
-EPS_END = 0.05
-EPS_DECAY = 0.0000235
+EPS_END = 0.1
+EPS_DECAY = 0.00001255
 TARGET_UPDATE = 1
+
+now = time.localtime()
+#str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
+#    now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+str = 'test{0}-{1}-{2}_{3}_{4}_{5}_{6}_{7}_{8}'.format(
+    num_episodes, DISCOUNT_FACTOR, '1e-6','1th','txr2', seed, now.tm_hour, now.tm_min, now.tm_sec)
+path = os.path.join(os.getcwd(), 'results')
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
 # 가져옵니다. 이 시점에 일반적으로 3x40x90 에 가깝습니다.
@@ -267,16 +270,10 @@ TARGET_UPDATE = 1
 # gym 행동 공간에서 행동의 숫자를 얻습니다.
 n_actions = env.action_space.n
 
-#checkpoint = torch.load(path + '/file2022_3_7_12_14_13')
 policy_net = DQN().to(device)
-#policy_net.load_state_dict(checkpoint['policy_net'])
 target_net = DQN().to(device)
-#target_net.load_state_dict(checkpoint['target_net'])
-#target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
-#policy_net.eval()
-
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
+optimizer = optim.Adam(policy_net.parameters(), lr=1e-6)
 memory = ReplayMemory(100000)
 
 steps_done = 0
@@ -385,6 +382,7 @@ show_state = []
 show_next_states = []
 i_episode = 0
 reward_count = 0
+maxs=[]
 
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
@@ -392,16 +390,16 @@ for i_episode in tqdm(range(num_episodes)):
     state = torch.Tensor(state)
     throughput_count=0
     # print('state type : ',state.type())
+    max_count=0
     for t in count():
         # 행동 선택과 수행
         action = select_action(state)
-        time.sleep(0.05)
         next_state, reward, done, last_set = env.step(action.item())
 
         state_reshape = np.reshape(state, (env.N+2, 4))
         next_state_reshape = np.reshape(next_state, (env.N+2, 4))
 
-        if i_episode > (num_episodes - 3) or i_episode == num_episodes//2:
+        if i_episode > (num_episodes - 3):
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f dispersed:%6.3f move:%6.3f txr:%3d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
@@ -409,7 +407,6 @@ for i_episode in tqdm(range(num_episodes)):
 
         if last_set[0] != 0:
             throughput_count += 1
-
 
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
@@ -428,6 +425,9 @@ for i_episode in tqdm(range(num_episodes)):
         # 메모리에 변이 저장
         memory.push(state, action, next_state, reward)
 
+        if torch.argmax(policy_net(state)) == action:
+            max_count += 1
+
         # 다음 상태로 이동
         state = next_state
 
@@ -437,6 +437,8 @@ for i_episode in tqdm(range(num_episodes)):
             # episode_durations.append(t + 1)
             # plot_durations()
             break
+
+    maxs.append(max_count)
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
@@ -462,6 +464,20 @@ def get_mean(array):
         means.append(sum / env.MAX_STEPS)
     return means
 
+def get_reward_mean2(array):
+    means = []
+    for n in range(0,num_episodes//50,1):
+        sum = 0
+        for i in range(50):
+            sum+=array[n*(50)+i]
+        means.append(sum/50)
+    return means
+
+'''plt.figure()
+plt.title('max_count')
+plt.xlabel('episode')
+plt.ylabel('count')
+plt.plot(maxs)'''
 
 plt.figure()
 plt.title('throughput')
@@ -477,11 +493,11 @@ x_values = list(range(throughputs.__len__()))
 y_values = [y for y in throughputs]
 plt.scatter(x_values, y_values, s=40)"""
 
-plt.figure()
+'''plt.figure()
 plt.title('reward')
 plt.xlabel('step')
 plt.ylabel('Reward')
-plt.plot(rewards)
+plt.plot(rewards)'''
 
 reward_means = get_mean(rewards)
 plt.figure()
@@ -489,6 +505,13 @@ plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
 plt.plot(reward_means)
+
+reward_means2 = get_reward_mean2(reward_means)
+plt.figure()
+plt.title('reward mean2')
+plt.xlabel('50 episodes')
+plt.ylabel('Reward')
+plt.plot(reward_means2)
 
 plt.figure()
 plt.title('eps')
@@ -515,7 +538,7 @@ plt.plot(loss_means)
     return (x, y, z)"""
 
 # 3D 그래프 그리기
-fig = plt.figure()
+'''fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 plt.title('position')
 ax.set_xlabel('X')
@@ -546,7 +569,7 @@ ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.tr
            s=60, c='purple')
 
 ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
-plt.show()
+plt.show()'''
 # env.render()
 env.close()
 plt.ioff()

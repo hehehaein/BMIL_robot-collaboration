@@ -7,4 +7,4 @@ def translate_action(action):
     for i in range(4):
         array[i] = array[i] - 1
     return array
-print(translate_action(42))
+print(translate_action(55))

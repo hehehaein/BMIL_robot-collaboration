@@ -112,7 +112,7 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = u + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
+        reward = u + (throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
         return reward
 
 class My_DQN(gym.Env):
@@ -124,7 +124,7 @@ class My_DQN(gym.Env):
     # ~number of relay node
     N = 2
     # ~transmission radius max
-    R_MAX = 4
+    R_MAX = 3
     # location x,y,z
     MIN_LOC = 0
     MAX_LOC = 4
@@ -132,7 +132,7 @@ class My_DQN(gym.Env):
     MIN_HEIGHT = 1
     MAX_HEIGHT = 4
 
-    source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, R_MAX))
+    source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, 2))
     dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
     agent2 = np.array((2,3,3,3))
 
