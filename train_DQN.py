@@ -64,6 +64,7 @@ import os
 from collections import namedtuple, deque
 from itertools import count
 from ray.tune.registry import register_env
+
 from gymExample.gym_example.envs.my_dqn_env import My_DQN
 
 import torch
@@ -77,8 +78,6 @@ from tqdm import tqdm
 select_env = "dqn-v0"
 register_env(select_env, lambda config: My_DQN())
 env = gym.make(select_env).unwrapped
-path = os.getcwd()
-print(path)
 
 # matplotlib 설정
 is_ipython = 'inline' in matplotlib.get_backend()
@@ -91,6 +90,13 @@ seed = 3
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
+os.environ["PYTHONHASHSEED"]=str(seed)
+
+now = time.localtime()
+str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
+    now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
+path = os.path.join(os.getcwd(), 'results')
 
 # GPU를 사용할 경우
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -245,11 +251,11 @@ class DQN(nn.Module):
 #
 
 BATCH_SIZE = 32
-num_episodes = 10000
+num_episodes = 4000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.05
-EPS_DECAY = 0.0000094
+EPS_DECAY = 0.0000235
 TARGET_UPDATE = 1
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
@@ -261,10 +267,14 @@ TARGET_UPDATE = 1
 # gym 행동 공간에서 행동의 숫자를 얻습니다.
 n_actions = env.action_space.n
 
+#checkpoint = torch.load(path + '/file2022_3_7_12_14_13')
 policy_net = DQN().to(device)
+#policy_net.load_state_dict(checkpoint['policy_net'])
 target_net = DQN().to(device)
-target_net.load_state_dict(policy_net.state_dict())
+#target_net.load_state_dict(checkpoint['target_net'])
+#target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
+#policy_net.eval()
 
 optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
 memory = ReplayMemory(100000)
@@ -308,8 +318,6 @@ def select_action(state):
 #
 
 losses = []
-
-
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
@@ -377,10 +385,6 @@ show_state = []
 show_next_states = []
 i_episode = 0
 reward_count = 0
-now = time.localtime()
-str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
-    now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
-#os.makedirs(path + '\\' + str)
 
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
@@ -439,22 +443,21 @@ for i_episode in tqdm(range(num_episodes)):
 
     throughputs.append(throughput_count)
 
-'''with open(path + '\\')
+f=open(path+'/'+str,'w')
 torch.save({
     'target_net': target_net.state_dict(),
     'policy_net': policy_net.state_dict(),
     'optimizer': optimizer.state_dict()
-}, path + '\\' + str)'''
+}, path+'/'+str)
 
 print('Complete')
 
-
+print(losses.__len__())
 def get_mean(array):
     means = []
-    sum = 0
-    for n in range(num_episodes):
+    for n in range(0,num_episodes,1):
         sum = 0
-        for i in range(env.MAX_STEPS):
+        for i in range(0,env.MAX_STEPS,1):
             sum += array[(n*env.MAX_STEPS)+i]
         means.append(sum / env.MAX_STEPS)
     return means

@@ -100,7 +100,10 @@ class reward_set:
             return now_disperse / (adj_nodes * my_txr)
 
     def cal_used_energy_to_move(self, action):
-        energy_move = 11.2*(0.5*(abs(action[0])+abs(action[1]))+abs(action[2]))
+        x = abs(action[0])
+        y = abs(action[1])
+        z = abs(action[2])
+        energy_move = 11.2*(0.5*(x + y) + z)
         return energy_move
 
     def cal_used_energy_to_keep_txr(self, my_txr):
@@ -109,7 +112,7 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = u + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr / 3)
+        reward = u + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
         return reward
 
 class My_DQN(gym.Env):
@@ -121,7 +124,7 @@ class My_DQN(gym.Env):
     # ~number of relay node
     N = 2
     # ~transmission radius max
-    R_MAX = 3
+    R_MAX = 4
     # location x,y,z
     MIN_LOC = 0
     MAX_LOC = 4
