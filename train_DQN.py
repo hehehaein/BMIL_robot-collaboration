@@ -86,7 +86,7 @@ if is_ipython:
 
 plt.ion()
 
-seed = 3
+seed = 1
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -247,18 +247,18 @@ class DQN(nn.Module):
 #    포함 된 셀 밑에 있으며, 매 에피소드마다 업데이트됩니다.
 #
 BATCH_SIZE = 32
-num_episodes = 8000
+num_episodes = 10
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.1
-EPS_DECAY = 0.00001255
+EPS_DECAY = 0.00000078
 TARGET_UPDATE = 1
 
 now = time.localtime()
 #str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
 #    now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
 str = 'test{0}-{1}-{2}_{3}_{4}_{5}_{6}_{7}_{8}'.format(
-    num_episodes, DISCOUNT_FACTOR, '1e-6','1th','txr2', seed, now.tm_hour, now.tm_min, now.tm_sec)
+    num_episodes, DISCOUNT_FACTOR, '1e-5','2th','txr2', seed, now.tm_hour, now.tm_min, now.tm_sec)
 path = os.path.join(os.getcwd(), 'results')
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
@@ -273,7 +273,7 @@ n_actions = env.action_space.n
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
 target_net.eval()
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-6)
+optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
 memory = ReplayMemory(100000)
 
 steps_done = 0

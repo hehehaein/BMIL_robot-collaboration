@@ -9,6 +9,12 @@ import math
 import networkx as nx
 from matplotlib import pyplot as plt
 
+seed = 1
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
+os.environ["PYTHONHASHSEED"]=str(seed)
 
 class reward_set:
     def __init__(self, N):
@@ -112,7 +118,7 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = u + (throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
+        reward = u + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
         return reward
 
 class My_DQN(gym.Env):
@@ -168,10 +174,19 @@ class My_DQN(gym.Env):
         observation (object): the initial observation of the space.
         """
         self.count = 0
+        relay_node = []
+        x = random.randint(self.MIN_LOC, self.MAX_LOC)
+        y = random.randint(self.MIN_LOC, self.MAX_LOC)
+        z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT)
+        r = random.randint(0, self.R_MAX)
+        relay_node.append(x)
+        relay_node.append(y)
+        relay_node.append(z)
+        relay_node.append(r)
 
         state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):
-            state_set[0][i] = copy.deepcopy(self.dest[i])  # 릴레이노드
+            state_set[0][i] = copy.deepcopy(relay_node[i])  # 릴레이노드
             state_set[1][i] = copy.deepcopy(self.agent2[i])
             state_set[2][i] = copy.deepcopy(self.source[i])
             state_set[3][i] = copy.deepcopy(self.dest[i])
