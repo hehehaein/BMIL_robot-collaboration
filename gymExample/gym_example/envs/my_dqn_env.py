@@ -1,4 +1,5 @@
 import copy
+import os
 from itertools import product
 
 import gym
@@ -8,6 +9,7 @@ import random
 import math
 import networkx as nx
 from matplotlib import pyplot as plt
+from ray.rllib.train import torch
 
 seed = 1
 random.seed(seed)
@@ -118,7 +120,7 @@ class reward_set:
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 5  # constant that guarantees the reward to be non-negative
-        reward = u + (2*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
+        reward = u + (throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
         return reward
 
 class My_DQN(gym.Env):
@@ -264,10 +266,12 @@ class My_DQN(gym.Env):
                 self.next_state[0 + i] += real_action[i]
 
             # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
-            for i in range(0, 2, 1):  # x,y좌표 이동범위 넘었나 확인
-                if (self.next_state[0 + i] < self.MIN_LOC) or (self.MAX_LOC < self.next_state[0 + i]):
-                    self.next_state[0 + i] -= real_action[i]
-                    real_action[i] = 0
+            if (self.next_state[0+0] > self.MAX_LOC) or (self.next_state[0 + 0] < self.MIN_LOC):  # z좌표 이동범위 넘었나 확인
+                self.next_state[0 + 0] -= real_action[0]
+                real_action[0] = 0
+            if (self.next_state[0 + 1] > self.MAX_LOC) or (self.next_state[0 + 1] < self.MIN_LOC):  # z좌표 이동범위 넘었나 확인
+                self.next_state[0 + 1] -= real_action[1]
+                real_action[1] = 0
             if (self.next_state[0 + 2] > self.MAX_HEIGHT) or (self.next_state[0 + 2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
                 self.next_state[0 + 2] -= real_action[2]
                 real_action[2] = 0
@@ -283,10 +287,8 @@ class My_DQN(gym.Env):
             state_position_array = np.reshape(self.state, (self.N + 2, 4))
 
             next_position_array = np.reshape(self.next_state, (self.N + 2, 4))
-            #print('next_position_array\n', next_position_array)
             env = reward_set(self.N)
             adj_arr = env.cal_adjacency(next_position_array)
-            #print("adj_arr",adj_arr)
             self.throughput = env.cal_throughput(adj_arr)
             foot = env.cal_foot(next_position_array, self.source, self.dest, 0)
             dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)

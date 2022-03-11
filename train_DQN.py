@@ -247,10 +247,10 @@ class DQN(nn.Module):
 #    포함 된 셀 밑에 있으며, 매 에피소드마다 업데이트됩니다.
 #
 BATCH_SIZE = 32
-num_episodes = 10
-DISCOUNT_FACTOR = 0.9
+num_episodes = 128000
+DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
-EPS_END = 0.1
+EPS_END = 0.01
 EPS_DECAY = 0.00000078
 TARGET_UPDATE = 1
 
@@ -258,7 +258,7 @@ now = time.localtime()
 #str = 'file{0}_{1}_{2}_{3}_{4}_{5}'.format(
 #    now.tm_year, now.tm_mon, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec)
 str = 'test{0}-{1}-{2}_{3}_{4}_{5}_{6}_{7}_{8}'.format(
-    num_episodes, DISCOUNT_FACTOR, '1e-5','2th','txr2', seed, now.tm_hour, now.tm_min, now.tm_sec)
+    num_episodes, DISCOUNT_FACTOR, '1e-5','1th','txr2', seed, now.tm_hour, now.tm_min, now.tm_sec)
 path = os.path.join(os.getcwd(), 'results')
 
 # AI gym에서 반환된 형태를 기반으로 계층을 초기화 하도록 화면의 크기를
@@ -383,7 +383,11 @@ show_next_states = []
 i_episode = 0
 reward_count = 0
 maxs=[]
-
+optimal = 0
+stay = 0
+opti_count = []
+stay_count = []
+move_count = 0
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
     state = env.reset()
@@ -391,6 +395,9 @@ for i_episode in tqdm(range(num_episodes)):
     throughput_count=0
     # print('state type : ',state.type())
     max_count=0
+    #optimal = 0
+    stay = 0
+    move_count=0
     for t in count():
         # 행동 선택과 수행
         action = select_action(state)
@@ -398,6 +405,25 @@ for i_episode in tqdm(range(num_episodes)):
 
         state_reshape = np.reshape(state, (env.N+2, 4))
         next_state_reshape = np.reshape(next_state, (env.N+2, 4))
+
+        '''if next_state_reshape[0][0] == 1 and \
+                next_state_reshape[0][1] == 1 and\
+                next_state_reshape[0][2] == 1 and\
+                next_state_reshape[0][3] == 3:
+            optimal += 1'''
+        if next_state_reshape[0][0] == 1 and \
+                next_state_reshape[0][1] == 1 and \
+                next_state_reshape[0][2] == 1 and \
+                next_state_reshape[0][3] == 3:
+            if np.array_equal(next_state_reshape, state_reshape):
+                stay += 1
+
+        move_count+=1
+
+        if reward > 6.8:
+            print(state_reshape[0], next_state_reshape[0],
+                  "action:%2d%2d%2d%2d reward:%.6f count:%2d"
+                  % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
 
         if i_episode > (num_episodes - 3):
             print(state_reshape[0], next_state_reshape[0],
@@ -438,6 +464,8 @@ for i_episode in tqdm(range(num_episodes)):
             # plot_durations()
             break
 
+    #opti_count.append(optimal)
+    stay_count.append(stay)
     maxs.append(max_count)
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
@@ -473,11 +501,32 @@ def get_reward_mean2(array):
         means.append(sum/50)
     return means
 
+def get_reward_mean3(array):
+    means = []
+    for n in range(0,num_episodes//500,1):
+        sum = 0
+        for i in range(500):
+            sum+=array[n*(500)+i]
+        means.append(sum/500)
+    return means
+
 '''plt.figure()
 plt.title('max_count')
 plt.xlabel('episode')
 plt.ylabel('count')
 plt.plot(maxs)'''
+
+'''plt.figure()
+plt.title('optimal count')
+plt.xlabel('episode')
+plt.ylabel('count')
+plt.plot(opti_count)'''
+
+plt.figure()
+plt.title('stay count')
+plt.xlabel('episode')
+plt.ylabel('count')
+plt.plot(stay_count)
 
 plt.figure()
 plt.title('throughput')
@@ -512,6 +561,13 @@ plt.title('reward mean2')
 plt.xlabel('50 episodes')
 plt.ylabel('Reward')
 plt.plot(reward_means2)
+
+reward_means3 = get_reward_mean3(reward_means)
+plt.figure()
+plt.title('reward mean3')
+plt.xlabel('50 episodes')
+plt.ylabel('Reward')
+plt.plot(reward_means3)
 
 plt.figure()
 plt.title('eps')
