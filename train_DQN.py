@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import gym
 import random
 import numpy as np
@@ -82,25 +83,31 @@ class DQN(nn.Module):
         return self.linear3(x)
 
 BATCH_SIZE = 32
-num_episodes = 128000
-DISCOUNT_FACTOR = 0.8
+num_episodes = 64000
+STEPS = 20
+DISCOUNT_FACTOR = 0.
 EPS_START = 0.99
 EPS_END = 0.01
-EPS_DECAY = 0.00000078
+EPS_DECAY = (EPS_START-EPS_END) / (num_episodes * STEPS * 0.75)
 TARGET_UPDATE = 1
+UPDATE_FREQ = 50
+BUFFER = 100000
+LEARNING_RATE = 1e-5
 
 now = time.localtime()
-str = 'test{0}-{1}-{2}_{3}_{4}_{5}_{6}_{7}_{8}'.format(
-    num_episodes, DISCOUNT_FACTOR, '1e-5','1th','txr2', seed, now.tm_hour, now.tm_min, now.tm_sec)
+str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}'.format(
+    num_episodes, STEPS, DISCOUNT_FACTOR, EPS_DECAY*100000000, TARGET_UPDATE, UPDATE_FREQ,
+    BUFFER, LEARNING_RATE,  seed, now.tm_hour, now.tm_min, now.tm_sec)
 path = os.path.join(os.getcwd(), 'results')
 
 n_actions = env.action_space.n
 
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
+optimal_net = DQN().to(device)
 target_net.eval()
-optimizer = optim.Adam(policy_net.parameters(), lr=1e-5)
-memory = ReplayMemory(100000)
+optimizer = optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
+memory = ReplayMemory(BUFFER)
 
 steps_done = 0
 epslions = []
@@ -204,7 +211,7 @@ for i_episode in tqdm(range(num_episodes)):
     #optimal = 0
     stay = 0
     move_count=0
-    for t in count():
+    for t in range(0,20,1):
         # 행동 선택과 수행
         action = select_action(state)
         next_state, reward, done, last_set = env.step(action.item())
@@ -227,6 +234,7 @@ for i_episode in tqdm(range(num_episodes)):
         move_count+=1
 
         if reward > 6.8:
+            max_count +=1
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d reward:%.6f count:%2d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
@@ -264,6 +272,7 @@ for i_episode in tqdm(range(num_episodes)):
         state = next_state
 
         # (정책 네트워크에서) 최적화 한단계 수행
+
         optimize_model()
         if done:
             # episode_durations.append(t + 1)
@@ -276,13 +285,15 @@ for i_episode in tqdm(range(num_episodes)):
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
-
+    if max_count == 20:
+        optimal_net.load_state_dict(policy_net.state_dict())
     throughputs.append(throughput_count)
 
 f=open(path+'/'+str,'w')
 torch.save({
     'target_net': target_net.state_dict(),
     'policy_net': policy_net.state_dict(),
+    'optimal_net': optimal_net.state_dict(),
     'optimizer': optimizer.state_dict()
 }, path+'/'+str)
 
@@ -293,9 +304,9 @@ def get_mean(array):
     means = []
     for n in range(0,num_episodes,1):
         sum = 0
-        for i in range(0,env.MAX_STEPS,1):
-            sum += array[(n*env.MAX_STEPS)+i]
-        means.append(sum / env.MAX_STEPS)
+        for i in range(0,STEPS,1):
+            sum += array[(n*STEPS)+i]
+        means.append(sum / STEPS)
     return means
 
 def get_reward_mean2(array):
@@ -348,11 +359,11 @@ x_values = list(range(throughputs.__len__()))
 y_values = [y for y in throughputs]
 plt.scatter(x_values, y_values, s=40)"""
 
-'''plt.figure()
+plt.figure()
 plt.title('reward')
 plt.xlabel('step')
 plt.ylabel('Reward')
-plt.plot(rewards)'''
+plt.plot(rewards)
 
 reward_means = get_mean(rewards)
 plt.figure()
@@ -381,12 +392,11 @@ plt.xlabel('step')
 plt.ylabel('epsilon')
 plt.plot(epslions)
 
-loss_means = get_mean(losses)
 plt.figure()
 plt.title('loss')
-plt.xlabel('episode')
+plt.xlabel('step')
 plt.ylabel('loss')
-plt.plot(loss_means)
+plt.plot(losses)
 
 """def create_sphere(cx, cy, cz, r):
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]

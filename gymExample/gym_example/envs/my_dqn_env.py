@@ -127,8 +127,6 @@ class My_DQN(gym.Env):
     metadata = {
         "render.modes": ["human"]
     }
-
-    MAX_STEPS = 20
     # ~number of relay node
     N = 2
     # ~transmission radius max
@@ -247,61 +245,62 @@ class My_DQN(gym.Env):
                  use this for learning.
         """
 
-        if self.done:
+        '''if self.done:
             # code should never reach this point
             print("EPISODE DONE!!!")
 
         elif self.count == self.MAX_STEPS:
             self.done = True
 
-        else:
+        else:'''
 
-            # print('my_env action : ', action)
-            assert self.action_space.contains(action)
-            self.count += 1
-            real_action = self.translate_action(action)
-            self.next_state = copy.deepcopy(self.state)
-            # action을 모두 수행
-            for i in range(4):
-                self.next_state[0 + i] += real_action[i]
+        # print('my_env action : ', action)
+        assert self.action_space.contains(action)
+        self.count += 1
+        real_action = self.translate_action(action)
 
-            # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
-            if (self.next_state[0+0] > self.MAX_LOC) or (self.next_state[0 + 0] < self.MIN_LOC):  # z좌표 이동범위 넘었나 확인
+        self.next_state = copy.deepcopy(self.state)
+        # action을 모두 수행
+        for i in range(4):
+            self.next_state[i] += real_action[i]
+
+        # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
+            if (self.next_state[0 + 0] < self.MIN_LOC) or (self.MAX_LOC < self.next_state[0+0]):  # x좌표 이동범위 넘었나 확인
                 self.next_state[0 + 0] -= real_action[0]
                 real_action[0] = 0
-            if (self.next_state[0 + 1] > self.MAX_LOC) or (self.next_state[0 + 1] < self.MIN_LOC):  # z좌표 이동범위 넘었나 확인
+            if (self.next_state[0 + 1] < self.MIN_LOC) or (self.MAX_LOC < self.next_state[0+1]):  # y좌표 이동범위 넘었나 확인
                 self.next_state[0 + 1] -= real_action[1]
                 real_action[1] = 0
-            if (self.next_state[0 + 2] > self.MAX_HEIGHT) or (self.next_state[0 + 2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
+            if (self.next_state[0 + 2] < self.MIN_HEIGHT) or (self.MAX_HEIGHT < self.next_state[0 + 2]):  # z좌표 이동범위 넘었나 확인
                 self.next_state[0 + 2] -= real_action[2]
                 real_action[2] = 0
-            if (self.next_state[0 + 3] > self.R_MAX) or (self.next_state[0 + 3] < 0):  # txr 가능범위 넘었나 확인
+            if (self.next_state[0 + 3] < 0) or ( self.R_MAX < self.next_state[0 + 3]):  # txr 가능범위 넘었나 확인
                 self.next_state[0 + 3] -= real_action[3]
                 real_action[3] = 0
 
-            self.last_set[5] = real_action[0]
-            self.last_set[6] = real_action[1]
-            self.last_set[7] = real_action[2]
-            self.last_set[8] = real_action[3]
+        self.last_set[5] = real_action[0]
+        self.last_set[6] = real_action[1]
+        self.last_set[7] = real_action[2]
+        self.last_set[8] = real_action[3]
 
-            state_position_array = np.reshape(self.state, (self.N + 2, 4))
+        state_position_array = np.reshape(self.state, (self.N + 2, 4))
+        next_position_array = np.reshape(self.next_state, (self.N + 2, 4))
 
-            next_position_array = np.reshape(self.next_state, (self.N + 2, 4))
-            env = reward_set(self.N)
-            adj_arr = env.cal_adjacency(next_position_array)
-            self.throughput = env.cal_throughput(adj_arr)
-            foot = env.cal_foot(next_position_array, self.source, self.dest, 0)
-            dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
-            e_move = env.cal_used_energy_to_move(real_action)
-            e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
+        env = reward_set(self.N)
+        adj_arr = env.cal_adjacency(next_position_array)
+        self.throughput = env.cal_throughput(adj_arr)
+        foot = env.cal_foot(next_position_array, self.source, self.dest, 0)
+        dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
+        e_move = env.cal_used_energy_to_move(real_action)
+        e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
 
-            self.last_set[0] = self.throughput
-            self.last_set[1] = foot
-            self.last_set[2] = dispersed
-            self.last_set[3] = e_move
-            self.last_set[4] = e_txr
+        self.last_set[0] = self.throughput
+        self.last_set[1] = foot
+        self.last_set[2] = dispersed
+        self.last_set[3] = e_move
+        self.last_set[4] = e_txr
 
-            self.reward = env.cal_reward(self.throughput, foot, dispersed, e_move, e_txr)
+        self.reward = env.cal_reward(self.throughput, foot, dispersed, e_move, e_txr)
         try:
             assert self.observation_space.contains(self.next_state)
         except AssertionError:
@@ -310,33 +309,6 @@ class My_DQN(gym.Env):
         self.state = self.next_state
 
         return [self.next_state, self.reward, self.done, self.last_set]
-
-    def render(self, state, mode="human"):
-        """Renders the environment.
-
-        The set of supported modes varies per environment. (And some
-        environments do not support rendering at all.) By convention,
-        if mode is:
-
-        - human: render to the current display or terminal and
-          return nothing. Usually for human consumption.
-        - rgb_array: Return an numpy.ndarray with shape (x, y, 3),
-          representing RGB values for an x-by-y pixel image, suitable
-          for turning into a video.
-        - ansi: Return a string (str) or StringIO.StringIO containing a
-          terminal-style text representation. The text can include newlines
-          and ANSI escape sequences (e.g. for colors).
-
-        Note:
-            Make sure that your class's metadata 'render.modes' key includes
-              the list of supported modes. It's recommended to call super()
-              in implementations to use the functionality of this method.
-
-        Args:
-            mode (str): the mode to render with
-        """
-        # s = "position: {:2d}  reward: {:2d}  info: {}"
-        # print(s.format(self.state, self.reward, self.info))
 
     def seed(self, seed=None):
         """Sets the seed for this env's random number generator(s).
