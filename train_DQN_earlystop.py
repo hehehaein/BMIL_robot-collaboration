@@ -9,8 +9,11 @@ import os
 
 from collections import namedtuple, deque
 from itertools import count
-from ray.tune.registry import register_env
 
+
+from ray.tune.registry import register_env
+from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from gymExample.gym_example.envs.my_dqn_env import My_DQN
 
 import torch
@@ -173,6 +176,7 @@ def optimize_model():
         param.grad.data.clamp_(-1, 1)
     optimizer.step()
 
+trainer = Trainer(callbacks=[EarlyStopping(monitor="val_loss")])
 
 ######################################################################
 #

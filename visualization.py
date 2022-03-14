@@ -40,10 +40,11 @@ class DQN(nn.Module):
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         return self.linear3(x)
-
+path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load('./test32000-0.8-1e-4_1th_txr2_explo42000_1_22_5_34')['policy_net'])
+policy_net.load_state_dict(torch.load(path+'/64000_20_0.8_1.53125e-06_20_10_1th_100000_0.0001_1_18_6_45')['optimal_net'])
+policy_net.eval()
 
 select_env = "dqn-v0"
 register_env(select_env, lambda config: My_DQN())
@@ -61,12 +62,19 @@ state = env.reset()
 state = torch.Tensor(state)
 throughput_count = 0
 max_count = 0
-for t in count():
+stay = 0
+for t in range(0,20,1):
     # 행동 선택과 수행
     action = select_action(state)
     next_state, reward, done, last_set = env.step(action.item())
     state_reshape = np.reshape(state, (env.N + 2, 4))
     next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
+    if next_state_reshape[0][0] == 1 and \
+            next_state_reshape[0][1] == 1 and \
+            next_state_reshape[0][2] == 1 and \
+            next_state_reshape[0][3] == 3:
+        if np.array_equal(next_state_reshape, state_reshape):
+            stay += 1
     rewards.append(reward)
     reward = torch.tensor([reward], device=device)
     print('State:{}, Action:{}'.format(state, action))
@@ -88,33 +96,17 @@ plt.title('throughput')
 plt.xlabel('episode')
 plt.ylabel('throughput_count')
 plt.plot(throughputs)
-# reward_mean_list = []
-# for i in range(int(len(rewards))):
-#     a = rewards[i * env.MAX_STEPS + 1: i * env.MAX_STEPS + 1 + env.MAX_STEPS]
-#     reward_mean_list.append(np.mean(a))
-# reward_means = rewards
+
 plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
 plt.plot(rewards)
+
+print(stay)
+
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-plt.title('position')
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-ax.set_xlim3d(0, env.MAX_LOC)
-ax.set_ylim3d(env.MAX_LOC, 0)
-ax.set_zlim3d(0, env.MAX_LOC)
-color_list = ("olive", "orange", "green", "blue", "purple", "black", "cyan", "pink", "brown", "darkslategray")
-nodes = []
-nodes.append(env.source)
-nodes.append(env.dest)
-nodes.append(env.agent2)
-ax.scatter(np.transpose(trajectory)[0], np.transpose(trajectory)[1],
-           np.transpose(trajectory)[2], marker='o',s=60, c='purple')
-ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1],
-           np.transpose(nodes)[2], marker='o', s=80, c='cyan')
+plt.figure()
+
 plt.ioff()
 plt.show()

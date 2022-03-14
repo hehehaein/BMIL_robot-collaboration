@@ -91,8 +91,7 @@ class reward_set:
         return foot_of_perpendicular
     def cal_foot(self, next_state_array, source, destination, i):
         foot = next_state_array[i][3] \
-               - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination) \
-
+               - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination)
         return foot
 
     def cal_dispersed(self, i, my_txr, adj_array):
