@@ -82,17 +82,18 @@ class DQN(nn.Module):
         x = F.relu(self.linear2(x))
         return self.linear3(x)
 
-BATCH_SIZE = 64
-num_episodes = 128000
+BATCH_SIZE = 128
+num_episodes = 1000
 STEPS = 20
-DISCOUNT_FACTOR = 0.8
+DISCOUNT_FACTOR = 0.85
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START-EPS_END) / (num_episodes * STEPS * 0.5)
-TARGET_UPDATE = 20
+TARGET_UPDATE = 1
 UPDATE_FREQ = 10
 BUFFER = 100000
 LEARNING_RATE = 1e-4
+IS_DOUBLE_Q = True
 
 now = time.localtime()
 str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}'.format(
@@ -157,7 +158,12 @@ def optimize_model():
     # max(1)[0]으로 최고의 보상을 선택
     # 이것은 마스크를 기반으로 병합되어 기대 상태 값을 갖거나 상태가 최종인 경우 0을 갖습니다.
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    next_state_values[non_final_mask] = target_net(non_final_next_states).max(-1)[0].detach()
+    index = torch.zeros(BATCH_SIZE, device = device)
+    if IS_DOUBLE_Q :
+        index = policy_net(non_final_next_states).max(-1)[1].detach()
+        next_state_values = target_net(non_final_next_states)[index]
+    else :
+        next_state_values[non_final_mask] = target_net(non_final_next_states).max(-1)[0].detach()
     # 기대 Q 값 계산
     expected_state_action_values = (next_state_values * DISCOUNT_FACTOR) + reward_batch
 
@@ -211,7 +217,7 @@ for i_episode in tqdm(range(num_episodes)):
     #optimal = 0
     stay = 0
     move_count=0
-    for t in range(0,20,1):
+    for t in range(0,STEPS,1):
         # 행동 선택과 수행
         action = select_action(state)
         next_state, reward, done, last_set = env.step(action.item())
@@ -271,7 +277,6 @@ for i_episode in tqdm(range(num_episodes)):
         state = next_state
 
         # (정책 네트워크에서) 최적화 한단계 수행
-
         if i_episode % UPDATE_FREQ == 0 :
             optimize_model()
             if done:
@@ -285,7 +290,7 @@ for i_episode in tqdm(range(num_episodes)):
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
-    if stay > 17:
+    if max_count == 15:
         optimal_net.load_state_dict(policy_net.state_dict())
     throughputs.append(throughput_count)
 
