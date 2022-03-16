@@ -8,7 +8,6 @@ import time
 import os
 
 from collections import namedtuple, deque
-from itertools import count
 from ray.tune.registry import register_env
 
 from gymExample.gym_example.envs.my_dqn_env import My_DQN
@@ -82,23 +81,25 @@ class DQN(nn.Module):
         x = F.relu(self.linear2(x))
         return self.linear3(x)
 
-BATCH_SIZE = 128
-num_episodes = 1000
+BATCH_SIZE = 64
+num_episodes = 128000
 STEPS = 20
-DISCOUNT_FACTOR = 0.85
+DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START-EPS_END) / (num_episodes * STEPS * 0.5)
-TARGET_UPDATE = 1
-UPDATE_FREQ = 10
+TARGET_UPDATE = 40
+UPDATE_FREQ = 20
 BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = True
+ZERO = True
+SCHEDULER = False
 
 now = time.localtime()
-str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}'.format(
+str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}-{13}-{14}-{15}'.format(
     num_episodes, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
-    BUFFER, LEARNING_RATE,  seed, now.tm_hour, now.tm_min, now.tm_sec)
+    BUFFER, LEARNING_RATE,  seed, IS_DOUBLE_Q, ZERO, SCHEDULER, now.tm_hour, now.tm_min, now.tm_sec)
 path = os.path.join(os.getcwd(), 'results')
 
 n_actions = env.action_space.n
@@ -108,6 +109,8 @@ target_net = DQN().to(device)
 optimal_net = DQN().to(device)
 target_net.eval()
 optimizer = optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
+if SCHEDULER:
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 memory = ReplayMemory(BUFFER)
 
 steps_done = 0
@@ -119,6 +122,15 @@ def select_action(state):
     sample = random.random()
     eps_threshold = max(EPS_END, EPS_START - (EPS_DECAY * steps_done))
     epslions.append(eps_threshold)
+    a1 = []  # 빈 리스트 생성
+    a2 = []
+    a3 = []
+    for i in range(n_actions):
+        a1.append(1)
+        a2.append(3/356)
+        a3.append(0.0044)
+    a2[40] = 1/16
+    a3[40] = 81/125
 
     steps_done += 1
     if sample > eps_threshold:
@@ -128,7 +140,16 @@ def select_action(state):
             # 기대 보상이 더 큰 행동을 선택할 수 있습니다.
             return policy_net(state).max(-1)[1].view(1, 1)
     else:
-        return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
+        if ZERO:
+            if (20*STEPS*num_episodes)*0.5*0.66 < steps_done :
+                return torch.tensor([random.choices(range(0,n_actions), weights = a3)], device=device, dtype=torch.long)
+            elif (20*STEPS*num_episodes)*0.5*0.33 < steps_done:
+                return torch.tensor([random.choices(range(0,n_actions), weights = a2)], device=device, dtype=torch.long)
+            else :
+                return torch.tensor([random.choices(range(0,n_actions), weights = a1)], device=device, dtype=torch.long)
+        else :
+            return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
+
 
 losses = []
 #최적화의 한 단계를 수행함
@@ -179,18 +200,6 @@ def optimize_model():
         param.grad.data.clamp_(-1, 1)
     optimizer.step()
 
-
-######################################################################
-#
-# 아래에서 주요 학습 루프를 찾을 수 있습니다. 처음으로 환경을
-# 재설정하고 ``상태`` Tensor를 초기화합니다. 그런 다음 행동을
-# 샘플링하고, 그것을 실행하고, 다음 화면과 보상(항상 1)을 관찰하고,
-# 모델을 한 번 최적화합니다. 에피소드가 끝나면 (모델이 실패)
-# 루프를 다시 시작합니다.
-#
-# 아래에서 `num_episodes` 는 작게 설정됩니다. 노트북을 다운받고
-# 의미있는 개선을 위해서 300 이상의 더 많은 에피소드를 실행해 보십시오.
-#
 throughputs = []
 rewards = []
 scatters_front = []
@@ -290,7 +299,7 @@ for i_episode in tqdm(range(num_episodes)):
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
-    if max_count == 15:
+    if stay == 15:
         optimal_net.load_state_dict(policy_net.state_dict())
     throughputs.append(throughput_count)
 
@@ -451,14 +460,3 @@ env.close()
 plt.ioff()
 plt.show()
 
-######################################################################
-# 다음은 전체 결과 데이터 흐름을 보여주는 다이어그램입니다.
-#
-# .. figure:: /_static/img/reinforcement_learning_diagram.jpg
-#
-# 행동은 무작위 또는 정책에 따라 선택되어, gym 환경에서 다음 단계 샘플을 가져옵니다.
-# 결과를 재현 메모리에 저장하고 모든 반복에서 최적화 단계를 실행합니다.
-# 최적화는 재현 메모리에서 무작위 배치를 선택하여 새 정책을 학습합니다.
-# "이전" target_net은 최적화에서 기대 Q 값을 계산하는 데에도 사용되고,
-# 최신 상태를 유지하기 위해 가끔 업데이트됩니다.
-#
