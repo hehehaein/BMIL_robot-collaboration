@@ -119,9 +119,8 @@ epslions = []
 
 def select_action(state):
     global steps_done
-    sample = random.random()
-    eps_threshold = max(EPS_END, EPS_START - (EPS_DECAY * steps_done))
-    epslions.append(eps_threshold)
+
+    #멈춰있는 action 확률 키우기
     a1 = []  # 빈 리스트 생성
     a2 = []
     a3 = []
@@ -132,7 +131,12 @@ def select_action(state):
     a2[40] = 1/16
     a3[40] = 81/125
 
+    sample = random.random()
+    eps_threshold = max(EPS_END, EPS_START - (EPS_DECAY * steps_done))
+    epslions.append(eps_threshold)
     steps_done += 1
+
+    #eps greedy method
     if sample > eps_threshold:
         with torch.no_grad():
             # t.max (1)은 각 행의 가장 큰 열 값을 반환합니다.
@@ -150,9 +154,8 @@ def select_action(state):
         else :
             return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
 
-
-losses = []
 #최적화의 한 단계를 수행함
+losses = []
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
@@ -166,6 +169,7 @@ def optimize_model():
         if s is not None:
             non_final_next_states = torch.stack(tuple(torch.Tensor(s)))
 
+    '''propagation의 예측값 저장'''
     state_batch = torch.stack(batch.state)
     action_batch = torch.stack(batch.action)
     reward_batch = torch.stack(batch.reward)
@@ -189,44 +193,45 @@ def optimize_model():
     expected_state_action_values = (next_state_values * DISCOUNT_FACTOR) + reward_batch
 
     # Huber 손실 계산
+    '''loss 계산'''
     criterion = nn.SmoothL1Loss()
     loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
     losses.append(loss.item())
 
     # 모델 최적화
     optimizer.zero_grad()
+    '''backward propagation'''
     loss.backward()
+
     for param in policy_net.parameters():
         param.grad.data.clamp_(-1, 1)
+
+    '''경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.'''
     optimizer.step()
 
 throughputs = []
+throughput_counts = []
 rewards = []
-scatters_front = []
-scatters_middle = []
-scatters_tail = []
-
-show_state = []
-show_next_states = []
-i_episode = 0
-reward_count = 0
-maxs=[]
-optimal = 0
-stay = 0
-opti_count = []
 stay_count = []
+'''scatters_front = []
+scatters_middle = []
+scatters_tail = []'''
+
+reward_count = 0
 move_count = 0
+stay = 0
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
     state = env.reset()
     state = torch.Tensor(state)
-    throughput_count=0
-    # print('state type : ',state.type())
-    max_count=0
-    #optimal = 0
+    throughput_count = 0
     stay = 0
     move_count=0
+    max_count = 0
     for t in range(0,STEPS,1):
+        move_count+=1
+        throughput_value = 0
+
         # 행동 선택과 수행
         action = select_action(state)
         next_state, reward, done, last_set = env.step(action.item())
@@ -234,11 +239,6 @@ for i_episode in tqdm(range(num_episodes)):
         state_reshape = np.reshape(state, (env.N+2, 4))
         next_state_reshape = np.reshape(next_state, (env.N+2, 4))
 
-        '''if next_state_reshape[0][0] == 1 and \
-                next_state_reshape[0][1] == 1 and\
-                next_state_reshape[0][2] == 1 and\
-                next_state_reshape[0][3] == 3:
-            optimal += 1'''
         if next_state_reshape[0][0] == 1 and \
                 next_state_reshape[0][1] == 1 and \
                 next_state_reshape[0][2] == 1 and \
@@ -246,42 +246,38 @@ for i_episode in tqdm(range(num_episodes)):
             if np.array_equal(next_state_reshape, state_reshape):
                 stay += 1
 
-        move_count+=1
         if reward > 6.8:
             max_count +=1
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d reward:%.6f count:%2d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
 
-        if i_episode > (num_episodes - 2):
+        if i_episode >= (num_episodes - 2):
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f dispersed:%6.3f move:%6.3f txr:%3d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
                      last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
 
         if last_set[0] != 0:
+            throughput_value = last_set[0]
             throughput_count += 1
 
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
-        if i_episode == (num_episodes - 1):
+        #3D plot
+        '''if i_episode == (num_episodes - 1):
             scatters_tail.append(np.array(next_state_reshape[0]))
         elif i_episode == num_episodes // 2:
             scatters_middle.append(np.array(next_state_reshape[0]))
         elif i_episode == 0:
-            scatters_front.append(np.array(next_state_reshape[0]))
+            scatters_front.append(np.array(next_state_reshape[0]))'''
 
         next_state = torch.Tensor(next_state)
         if done:
             next_state = None
-
         # 메모리에 변이 저장
         memory.push(state, action, next_state, reward)
-
-        '''if torch.argmax(policy_net(state)) == action:
-            max_count += 1'''
-
         # 다음 상태로 이동
         state = next_state
 
@@ -293,15 +289,21 @@ for i_episode in tqdm(range(num_episodes)):
                 # plot_durations()
                 break
 
-    #opti_count.append(optimal)
-    stay_count.append(stay)
-    maxs.append(max_count)
+    #gradient 출력
+    '''if i_episode == num_episodes-1:
+        for p in policy_net.parameters():
+            with torch.no_grad():
+                print(p.grad, len(p.grad), p.grad.shape)'''
+
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
     if stay == 15:
         optimal_net.load_state_dict(policy_net.state_dict())
-    throughputs.append(throughput_count)
+
+    throughputs.append(throughput_value)
+    throughput_counts.append(throughput_count)
+    stay_count.append(stay)
 
 f=open(path+'/'+str,'w')
 torch.save({
@@ -313,44 +315,17 @@ torch.save({
 
 print('Complete')
 
-def get_mean(array):
+def get_mean(array, k):
     means = []
-    for n in range(0,num_episodes,1):
+    m = k
+    if k == STEPS:
+        m = 1
+    for n in range(0, num_episodes//m, 1):
         sum = 0
-        for i in range(0,STEPS,1):
-            sum += array[(n*STEPS)+i]
-        means.append(sum / STEPS)
+        for i in range(0, k, 1):
+            sum += array[(n*k)+i]
+        means.append(sum / k)
     return means
-
-def get_reward_mean2(array):
-    means = []
-    for n in range(0,num_episodes//50,1):
-        sum = 0
-        for i in range(50):
-            sum+=array[n*(50)+i]
-        means.append(sum/50)
-    return means
-
-def get_reward_mean3(array):
-    means = []
-    for n in range(0,num_episodes//500,1):
-        sum = 0
-        for i in range(500):
-            sum+=array[n*(500)+i]
-        means.append(sum/500)
-    return means
-
-plt.figure()
-plt.title('max_count')
-plt.xlabel('episode')
-plt.ylabel('count')
-plt.plot(maxs)
-
-'''plt.figure()
-plt.title('optimal count')
-plt.xlabel('episode')
-plt.ylabel('count')
-plt.plot(opti_count)'''
 
 plt.figure()
 plt.title('stay count')
@@ -358,19 +333,24 @@ plt.xlabel('episode')
 plt.ylabel('count')
 plt.plot(stay_count)
 
+throughput_means500 = get_mean(throughputs, 500)
 plt.figure()
-plt.title('throughput')
-plt.xlabel('episode')
-plt.ylabel('throughput_count')
-plt.plot(throughputs)
+plt.title('throughput value mean 500')
+plt.xlabel('500 episode')
+plt.ylabel('throughput value mean')
+plt.plot(throughput_means500)
+#list = [list(range(num_episodes//500))]
+#list.append(throughput_means500)
+#df = pd.DataFrame(list, columns=['500episode', 'throughput value mean'])
 
-"""plt.figure()
-plt.title('throughput')
-plt.xlabel('step')
-plt.ylabel('throughput')
-x_values = list(range(throughputs.__len__()))
-y_values = [y for y in throughputs]
-plt.scatter(x_values, y_values, s=40)"""
+#sns.relplot(data=df, kind='line', x='500episode', y='throughput value mean', ci='sd')
+
+throughput_count_means500 = get_mean(throughput_counts, 500)
+plt.figure()
+plt.title('throughput count mean 500')
+plt.xlabel('500 episode')
+plt.ylabel('throughput count mean')
+plt.plot(throughput_count_means500)
 
 '''plt.figure()
 plt.title('reward')
@@ -378,26 +358,26 @@ plt.xlabel('step')
 plt.ylabel('Reward')
 plt.plot(rewards)'''
 
-reward_means = get_mean(rewards)
+reward_means = get_mean(rewards, STEPS)
 plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
 plt.plot(reward_means)
 
-reward_means2 = get_reward_mean2(reward_means)
+'''reward_means50 = get_mean(reward_means, 50)
 plt.figure()
-plt.title('reward mean2')
+plt.title('reward mean 50')
 plt.xlabel('50 episodes')
 plt.ylabel('Reward')
-plt.plot(reward_means2)
+plt.plot(reward_means50)'''
 
-'''reward_means3 = get_reward_mean3(reward_means)
+reward_means500 = get_mean(reward_means, 500)
 plt.figure()
-plt.title('reward mean3')
-plt.xlabel('50 episodes')
+plt.title('reward mean 500')
+plt.xlabel('500 episodes')
 plt.ylabel('Reward')
-plt.plot(reward_means3)'''
+plt.plot(reward_means500)
 
 plt.figure()
 plt.title('eps')
@@ -455,7 +435,6 @@ ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.tr
 
 ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 plt.show()'''
-# env.render()
 env.close()
 plt.ioff()
 plt.show()
