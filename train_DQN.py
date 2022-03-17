@@ -11,6 +11,8 @@ from collections import namedtuple, deque
 from ray.tune.registry import register_env
 
 from gymExample.gym_example.envs.my_dqn_env import My_DQN
+from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning import Trainer
 
 import torch
 import torch.nn as nn
@@ -93,13 +95,14 @@ UPDATE_FREQ = 20
 BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = True
-ZERO = True
-SCHEDULER = False
+ZERO = False
+SCHEDULER = True
+SCHEDULER_GAMMA = 0.95
 
 now = time.localtime()
-str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}-{13}-{14}-{15}'.format(
+str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
     num_episodes, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
-    BUFFER, LEARNING_RATE,  seed, IS_DOUBLE_Q, ZERO, SCHEDULER, now.tm_hour, now.tm_min, now.tm_sec)
+    BUFFER, LEARNING_RATE,  seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec)
 path = os.path.join(os.getcwd(), 'results')
 
 n_actions = env.action_space.n
@@ -110,12 +113,13 @@ optimal_net = DQN().to(device)
 target_net.eval()
 optimizer = optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
 if SCHEDULER:
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=SCHEDULER_GAMMA)
 memory = ReplayMemory(BUFFER)
 
 steps_done = 0
 epslions = []
-
+earlystop = EarlyStopping(monitor='val_loss', patience=5, verbose=True, mode = 'min')
+trainer = Trainer(callbacks=[earlystop])
 
 def select_action(state):
     global steps_done
@@ -156,6 +160,8 @@ def select_action(state):
 
 #최적화의 한 단계를 수행함
 losses = []
+scheduler_lrs = []
+scheduler_check = False
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
@@ -208,10 +214,17 @@ def optimize_model():
 
     '''경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.'''
     optimizer.step()
+    if scheduler_check :
+        scheduler.step()
+        scheduler_lrs.append(scheduler.get_lr())
+    else :
+        scheduler_lrs.append(LEARNING_RATE)
 
 throughputs = []
 throughput_counts = []
 rewards = []
+throughputs_tail = []
+rewards_tail = []
 stay_count = []
 '''scatters_front = []
 scatters_middle = []
@@ -219,15 +232,25 @@ scatters_tail = []'''
 
 reward_count = 0
 move_count = 0
+maxes = []
+optimal = 0
 stay = 0
+opti_count = []
+stay_count = []
+move_count = 0
 for i_episode in tqdm(range(num_episodes)):
     # 환경과 상태 초기화
     state = env.reset()
     state = torch.Tensor(state)
     throughput_count = 0
+    throughputs_tail_count = 0
+    max_count=0
+    #optimal = 0
     stay = 0
     move_count=0
     max_count = 0
+    if SCHEDULER and i_episode == num_episodes//2:
+        scheduler_check = True
     for t in range(0,STEPS,1):
         move_count+=1
         throughput_value = 0
@@ -261,6 +284,11 @@ for i_episode in tqdm(range(num_episodes)):
         if last_set[0] != 0:
             throughput_value = last_set[0]
             throughput_count += 1
+
+        if 9 < t : #step 11~20까지의 reward와 throughput 저장
+            rewards_tail.append(reward)
+            if last_set[0] != 0 :
+                throughputs_tail_count += 1
 
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
@@ -300,8 +328,9 @@ for i_episode in tqdm(range(num_episodes)):
         target_net.load_state_dict(policy_net.state_dict())
     if stay == 15:
         optimal_net.load_state_dict(policy_net.state_dict())
-
+    throughputs.append(throughput_count)
     throughputs.append(throughput_value)
+    #throughputs_tail.append(throughputs_tail_count)
     throughput_counts.append(throughput_count)
     stay_count.append(stay)
 
@@ -327,6 +356,27 @@ def get_mean(array, k):
         means.append(sum / k)
     return means
 
+def get_mean_tail(array):
+    means = []
+    for n in range(0,num_episodes,1):
+        sum = 0
+        for i in range(0,STEPS//2,1):
+            sum += array[(n*(STEPS//2))+i]
+        means.append(sum / (STEPS/2))
+    return means
+
+'''plt.figure()
+plt.title('max_count')
+plt.xlabel('episode')
+plt.ylabel('count')
+plt.plot(maxs)'''
+
+'''plt.figure()
+plt.title('optimal count')
+plt.xlabel('episode')
+plt.ylabel('count')
+plt.plot(opti_count)'''
+
 plt.figure()
 plt.title('stay count')
 plt.xlabel('episode')
@@ -343,6 +393,33 @@ plt.plot(throughput_means500)
 #list.append(throughput_means500)
 #df = pd.DataFrame(list, columns=['500episode', 'throughput value mean'])
 
+'''plt.figure()
+plt.title('throughput_TAIL (max=10)')
+plt.xlabel('episode')
+plt.ylabel('throughput_tail_count')
+plt.plot(throughputs_tail)
+
+rewards_tail_means = get_mean_tail(rewards_tail)
+plt.figure()
+plt.title('reward_TAIL mean')
+plt.xlabel('episode')
+plt.ylabel('Reward')
+plt.plot(rewards_tail_means)
+
+rewards_tail_means2 = get_reward_mean2(rewards_tail_means)
+plt.figure()
+plt.title('reward_TAIL mean2')
+plt.xlabel('50 episodes')
+plt.ylabel('Reward')
+plt.plot(rewards_tail_means2)'''
+
+"""plt.figure()
+plt.title('throughput')
+plt.xlabel('step')
+plt.ylabel('throughput')
+x_values = list(range(throughputs.__len__()))
+y_values = [y for y in throughputs]
+plt.scatter(x_values, y_values, s=40)"""
 #sns.relplot(data=df, kind='line', x='500episode', y='throughput value mean', ci='sd')
 
 throughput_count_means500 = get_mean(throughput_counts, 500)
@@ -378,6 +455,12 @@ plt.title('reward mean 500')
 plt.xlabel('500 episodes')
 plt.ylabel('Reward')
 plt.plot(reward_means500)
+
+'''plt.figure()
+plt.title('scheduler')
+plt.xlabel('episode')
+plt.ylabel('lr')
+plt.plot(scheduler_lrs)'''
 
 plt.figure()
 plt.title('eps')
@@ -435,6 +518,7 @@ ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.tr
 
 ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 plt.show()'''
+# env.render()
 env.close()
 plt.ioff()
 plt.show()
