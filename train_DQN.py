@@ -91,8 +91,8 @@ DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
-TARGET_UPDATE = 1
-UPDATE_FREQ = 10
+TARGET_UPDATE = 40
+UPDATE_FREQ = 20
 BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = False
@@ -292,12 +292,10 @@ for i_episode in tqdm(range(NUM_EPISODES)):
                      last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
 
         if last_set[0] != 0:
-            throughput_value = last_set[0]
             throughput_count += 1
 
 
-        throughput_counts.append(throughput_count)
-        throughputs.append(throughput_value)
+        throughputs.append(last_set[0])
         foots.append(last_set[1])
         disperses.append(last_set[2])
         moves.append(last_set[3])
@@ -330,11 +328,11 @@ for i_episode in tqdm(range(NUM_EPISODES)):
                 break
 
     f1 = open(path + '/' + str, 'w')
-    f2 = open(path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
+    '''f2 = open(path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
         NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
         BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec), 'w')
 
-    if (i_episode % 100 == 0) and (NUM_EPISODES//2 < i_episode):
+    if (i_episode % 100 == 0) and (100000 < i_episode):
         tmp_net.load_state_dict(policy_net.state_dict())
         torch.save({'epi{}'.format(i_episode): tmp_net.state_dict()}, path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}_{17}_epi'.format(
                                                                         NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
@@ -347,9 +345,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
                      'TXR': txrs,
                      'REWARD': rewards
                      })
-        data.to_pickle(path+'/'+str+'epi{}'.format(i_episode)+'_data.pickle')
-        '''with open(path+'/'+str+'epi{}'.format(i_episode)+'_data.json', 'w', encoding='utf-8') as make_file:
-            json.dump(file_data, make_file, ensure_ascii=False, indent='\t')'''
+        data.to_pickle(path+'/'+str+'epi{}'.format(i_episode)+'_data.pickle')'''
 
     # gradient 출력
     '''if i_episode == num_episodes-1:
@@ -363,6 +359,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     if stay == 15:
         optimal_net.load_state_dict(policy_net.state_dict())
     stay_count.append(stay)
+    throughput_counts.append(throughput_count)
 
 torch.save({
     'target_net': target_net.state_dict(),
@@ -398,44 +395,43 @@ def make_list(episode, term):
     return list
 
 plt.figure()
-throughput_count_means2 = get_mean(throughput_counts, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     '500 episode': make_list(NUM_EPISODES, 500),
-     'throughput count': throughput_count_means2}
+     '1000 episode': make_list(NUM_EPISODES, 1000),
+     'throughput count': throughput_counts}
 df = pd.DataFrame(data=d)
-th_count = sns.lineplot(data=df, x='500 episode', y='throughput count',ci='sd')
-th_count.set(title='throughput count')
+th_count = sns.lineplot(data=df, x='1000 episode', y='throughput count',ci='sd')
+th_count.set(title='throughput count (0~20)')
 
 plt.figure()
 throughput_means2 = get_mean(throughputs, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     '500 episode': make_list(NUM_EPISODES, 500),
+     '1000 episode': make_list(NUM_EPISODES, 1000),
      'throughput': throughput_means2}
 df = pd.DataFrame(data=d)
-th = sns.lineplot(data=df, x='500 episode', y='throughput',ci='sd')
-th.set(title='throughput')
+th = sns.lineplot(data=df, x='1000 episode', y='throughput',ci='sd')
+th.set(title='throughput(0/6.333)')
 
 plt.figure()
 reward_means2 = get_mean(rewards, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     '500 episode': make_list(NUM_EPISODES, 500),
+     '1000 episode': make_list(NUM_EPISODES, 1000),
      'reward': reward_means2}
 df = pd.DataFrame(data=d)
-reward = sns.lineplot(data=df, x='500 episode', y='reward',ci='sd')
+reward = sns.lineplot(data=df, x='1000 episode', y='reward',ci='sd')
 reward.set(title='reward')
 
-'''plt.figure()
-plt.title('stay count')
+plt.figure()
+plt.title('stay count(0~20)')
 plt.xlabel('episode')
 plt.ylabel('count')
-plt.plot(stay_count)'''
+plt.plot(stay_count)
 
-'''throughput_means500 = get_mean(throughputs, 500)
+throughput_means1000 = get_mean(throughputs, 1000)
 plt.figure()
-plt.title('throughput value mean 500')
-plt.xlabel('500 episode')
-plt.ylabel('throughput value mean')
-plt.plot(throughput_means500)'''
+plt.title('throughput value mean 1000')
+plt.xlabel('1000 episode')
+plt.ylabel('throughput value mean(0/6.333)')
+plt.plot(throughput_means1000)
 
 """plt.figure()
 plt.title('throughput')
@@ -445,12 +441,12 @@ x_values = list(range(throughputs.__len__()))
 y_values = [y for y in throughputs]
 plt.scatter(x_values, y_values, s=40)"""
 
-'''throughput_count_means500 = get_mean(throughput_counts, 500)
+throughput_count_means1000 = get_mean(throughput_counts, 1000)
 plt.figure()
-plt.title('throughput count mean 500')
-plt.xlabel('500 episode')
-plt.ylabel('throughput count mean')
-plt.plot(throughput_count_means500)'''
+plt.title('throughput count mean 1000')
+plt.xlabel('1000 episode')
+plt.ylabel('throughput count mean(0~20)')
+plt.plot(throughput_count_means1000)
 
 '''plt.figure()
 plt.title('reward')
@@ -458,8 +454,8 @@ plt.xlabel('step')
 plt.ylabel('Reward')
 plt.plot(rewards)'''
 
-'''reward_means = get_mean(rewards, STEPS)
-plt.figure()
+reward_means = get_mean(rewards, STEPS)
+'''plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
@@ -472,12 +468,12 @@ plt.xlabel('50 episodes')
 plt.ylabel('Reward')
 plt.plot(reward_means50)'''
 
-'''reward_means500 = get_mean(reward_means, 500)
+reward_means1000 = get_mean(reward_means, 1000)
 plt.figure()
-plt.title('reward mean 500')
-plt.xlabel('500 episodes')
+plt.title('reward mean 1000')
+plt.xlabel('1000 episodes')
 plt.ylabel('Reward')
-plt.plot(reward_means500)'''
+plt.plot(reward_means1000)
 
 '''plt.figure()
 plt.title('scheduler')
