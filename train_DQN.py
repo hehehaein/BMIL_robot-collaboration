@@ -9,7 +9,7 @@ import time
 import os
 import seaborn as sns; sns.set()
 import json
-
+import pickle
 from collections import namedtuple, deque, OrderedDict
 from ray.tune.registry import register_env
 
@@ -85,14 +85,14 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 1000
+NUM_EPISODES = 128000
 STEPS = 20
 DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
-TARGET_UPDATE = 40
-UPDATE_FREQ = 20
+TARGET_UPDATE = 1
+UPDATE_FREQ = 10
 BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = False
@@ -333,39 +333,23 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     f2 = open(path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
         NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
         BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec), 'w')
-    file_data = OrderedDict()
 
-    if (i_episode % 100 == 0):
+    if (i_episode % 100 == 0) and (NUM_EPISODES//2 < i_episode):
         tmp_net.load_state_dict(policy_net.state_dict())
-        torch.save({'epi{}'.format(i_episode): tmp_net.state_dict()}, path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}_{17}'.format(
+        torch.save({'epi{}'.format(i_episode): tmp_net.state_dict()}, path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}_{17}_epi'.format(
                                                                         NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
                                                                         BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec,i_episode))
-        file_data["BATCH_SIZE"]=BATCH_SIZE
-        file_data["NUM_EPISODES"]=NUM_EPISODES
-        file_data["STEPS"]=STEPS
-        file_data["DISCOUNT_FACTOR"]=DISCOUNT_FACTOR
-        file_data["EPS_START"]=EPS_START
-        file_data["EPS_END"]=EPS_END
-        file_data["EPS_DECAY"]=EPS_DECAY
-        file_data["TARGET_UPDATE"]=TARGET_UPDATE
-        file_data["UPDATE_FREQ"]=UPDATE_FREQ
-        file_data["BUFFER"]=BUFFER
-        file_data["LEARNING_RATE"]=LEARNING_RATE
-        file_data["SEED"]=seed
-        file_data["IS_DOUBLE_Q"]=IS_DOUBLE_Q
-        file_data["ZERO"] = ZERO
-        file_data["SCHEDULER"] = SCHEDULER
-        file_data["SCHEDULER_GAMMA"] = SCHEDULER_GAMMA
-        file_data["ACTION"] = actions
-        file_data["THROUGHPUT"] = throughput_value
-        file_data["FOOT"] = foots
-        file_data["DISPERSED"] = disperses
-        file_data["MOVE"] = moves
-        file_data["TXR"] = txrs
-        file_data["REWARD"] = rewards
-        json_data = json.dumps(file_data, ensure_ascii=False)
-        with open(path+'/'+str+'epi{}'.format(i_episode)+'_data.json', 'w', encoding='utf-8') as make_file:
-            json.dump(file_data, make_file, ensure_ascii=False, indent='\t')
+        data = pd.DataFrame({'ACTION': actions,
+                     'THROUGHPUT': throughputs,
+                     'FOOT': foots,
+                     'DISPERSED': disperses,
+                     'MOVE': moves,
+                     'TXR': txrs,
+                     'REWARD': rewards
+                     })
+        data.to_pickle(path+'/'+str+'epi{}'.format(i_episode)+'_data.pickle')
+        '''with open(path+'/'+str+'epi{}'.format(i_episode)+'_data.json', 'w', encoding='utf-8') as make_file:
+            json.dump(file_data, make_file, ensure_ascii=False, indent='\t')'''
 
     # gradient 출력
     '''if i_episode == num_episodes-1:
