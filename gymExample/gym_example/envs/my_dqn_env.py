@@ -4,8 +4,8 @@ from itertools import product
 
 import gym
 import numpy as np
-from gym.utils import seeding
 import random
+from gym.utils import seeding
 import math
 import networkx as nx
 from matplotlib import pyplot as plt
@@ -169,10 +169,10 @@ class My_DQN(gym.Env):
             z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT-2)
             r = random.randint(0, self.R_MAX)'''
         relay_node = []
-        x = random.randint(self.MIN_LOC, self.MAX_LOC)
-        y = random.randint(self.MIN_LOC, self.MAX_LOC)
-        z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT)
-        r = random.randint(0, self.R_MAX)
+        x = np.random.randint(self.MIN_LOC, self.MAX_LOC+1)
+        y = np.random.randint(self.MIN_LOC, self.MAX_LOC+1)
+        z = np.random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT+1)
+        r = np.random.randint(0, self.R_MAX+1)
         relay_node.append(x)
         relay_node.append(y)
         relay_node.append(z)

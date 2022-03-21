@@ -23,6 +23,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import torch.nn as L
+
 
 from tqdm import tqdm
 
@@ -81,8 +83,8 @@ class DQN(nn.Module):
     def forward(self, x):
         # x = x.to(device)
         # print('forward\n',x)
-        x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))
+        x = L.LeakyReLU(self.linear1(x))
+        x = L.LeakyReLU(self.linear2(x))
         return self.linear3(x)
 
 
@@ -93,8 +95,8 @@ DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
-TARGET_UPDATE = 40
-UPDATE_FREQ = 20
+TARGET_UPDATE = 10
+UPDATE_FREQ = 10
 BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q =  True
@@ -245,6 +247,7 @@ scatters_tail = []'''
 
 z_throughput = np.zeros((4, 5, 5))
 z_throughput_count = np.zeros((4, 5, 5))
+distribution = np.zeros((4, 5, 5))
 reward_count = 0
 move_count = 0
 maxes = []
@@ -367,6 +370,8 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
+    #distribution print
+    distribution[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += 1
     # z축기준 평면위치에 따른 throughput count 평균
     if (NUM_EPISODES/2 < i_episode):
         z_throughput[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += throughput_count
@@ -394,25 +399,31 @@ df1 = pd.DataFrame(data=z_throughput[0])
 df2 = pd.DataFrame(data=z_throughput[1])
 df3 = pd.DataFrame(data=z_throughput[2])
 df4 = pd.DataFrame(data=z_throughput[3])
+
+dis1 = pd.DataFrame(data=distribution[0])
+dis2 = pd.DataFrame(data=distribution[1])
+dis3 = pd.DataFrame(data=distribution[2])
+dis4 = pd.DataFrame(data=distribution[3])
+
 df1_count = pd.DataFrame(data=z_throughput_count[0])
 df2_count = pd.DataFrame(data=z_throughput_count[1])
 df3_count = pd.DataFrame(data=z_throughput_count[2])
 df4_count = pd.DataFrame(data=z_throughput_count[3])
 
 plt.figure()
-ax = sns.heatmap(df1, annot=True, vmin=0, vmax=20)
+ax = sns.heatmap(df1, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
 plt.title('z=1')
 
 plt.figure()
-ax = sns.heatmap(df2, annot=True, vmin=0, vmax=20)
+ax = sns.heatmap(df2, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
 plt.title('z=2')
 
 plt.figure()
-ax = sns.heatmap(df3, annot=True, vmin=0, vmax=20)
+ax = sns.heatmap(df3, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
 plt.title('z=3')
 
 plt.figure()
-ax = sns.heatmap(df4, annot=True, vmin=0, vmax=20)
+ax = sns.heatmap(df4, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
 plt.title('z=4')
 '''======================z_count======================'''
 plt.figure()
@@ -430,6 +441,19 @@ plt.title('z_count=3')
 plt.figure()
 ax = sns.heatmap(df4_count, annot=True, vmin=0, vmax=3000)
 plt.title('z_count=4')
+
+plt.figure()
+ax = sns.heatmap(dis1, annot=True, vmin=0, vmax=3000)
+plt.title('dis1')
+plt.figure()
+ax = sns.heatmap(dis2, annot=True, vmin=0, vmax=3000)
+plt.title('dis2')
+plt.figure()
+ax = sns.heatmap(dis3, annot=True, vmin=0, vmax=3000)
+plt.title('dis3')
+plt.figure()
+ax = sns.heatmap(dis4, annot=True, vmin=0, vmax=3000)
+plt.title('dis4')
 plt.show()
 
 '''
