@@ -153,6 +153,21 @@ class My_DQN(gym.Env):
 
     def reset(self):
         self.count = 0
+        '''if 21600 < epi:
+            x = random.randint(self.MIN_LOC, self.MAX_LOC)
+            y = random.randint(self.MIN_LOC, self.MAX_LOC)
+            z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT)
+            r = random.randint(0, self.R_MAX)
+        elif 5700 < epi:
+            x = random.randint(self.MIN_LOC, self.MAX_LOC-1)
+            y = random.randint(self.MIN_LOC, self.MAX_LOC-1)
+            z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT-1)
+            r = random.randint(0, self.R_MAX)
+        else :
+            x = random.randint(self.MIN_LOC, self.MAX_LOC-2)
+            y = random.randint(self.MIN_LOC, self.MAX_LOC-2)
+            z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT-2)
+            r = random.randint(0, self.R_MAX)'''
         relay_node = []
         x = random.randint(self.MIN_LOC, self.MAX_LOC)
         y = random.randint(self.MIN_LOC, self.MAX_LOC)

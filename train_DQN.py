@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import time
 import os
-import seaborn as sns; sns.set()
+import seaborn as sns;
+
+sns.set()
 import json
 import pickle
 from collections import namedtuple, deque, OrderedDict
@@ -95,7 +97,7 @@ TARGET_UPDATE = 40
 UPDATE_FREQ = 20
 BUFFER = 100000
 LEARNING_RATE = 1e-4
-IS_DOUBLE_Q = False
+IS_DOUBLE_Q =  True
 ZERO = False
 SCHEDULER = False
 SCHEDULER_GAMMA = 0.95
@@ -227,9 +229,10 @@ def optimize_model():
     else:
         scheduler_lrs.append(LEARNING_RATE)
 
+
 actions = []
 throughputs = []
-foots=[]
+foots = []
 disperses = []
 moves = []
 txrs = []
@@ -240,6 +243,8 @@ stay_count = []
 scatters_middle = []
 scatters_tail = []'''
 
+z_throughput = np.zeros((4, 5, 5))
+z_throughput_count = np.zeros((4, 5, 5))
 reward_count = 0
 move_count = 0
 maxes = []
@@ -294,12 +299,11 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         if last_set[0] != 0:
             throughput_count += 1
 
-
         throughputs.append(last_set[0])
-        foots.append(last_set[1])
+        '''foots.append(last_set[1])
         disperses.append(last_set[2])
         moves.append(last_set[3])
-        txrs.append(last_set[4])
+        txrs.append(last_set[4])'''
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
@@ -328,6 +332,8 @@ for i_episode in tqdm(range(NUM_EPISODES)):
                 break
 
     f1 = open(path + '/' + str, 'w')
+
+    # 데이터 저장
     '''f2 = open(path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
         NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
         BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec), 'w')
@@ -348,10 +354,10 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         data.to_pickle(path+'/'+str+'epi{}'.format(i_episode)+'_data.pickle')'''
 
     # gradient 출력
-    '''if i_episode == num_episodes-1:
+    if i_episode == NUM_EPISODES - 1:
         for p in policy_net.parameters():
             with torch.no_grad():
-                print(p.grad, len(p.grad), p.grad.shape)'''
+                print(p.grad, len(p.grad), p.grad.shape)
 
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
@@ -361,6 +367,19 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
+    # z축기준 평면위치에 따른 throughput count 평균
+    if (NUM_EPISODES/2 < i_episode):
+        z_throughput[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += throughput_count
+        z_throughput_count[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += 1
+
+
+for i in range(4):
+    for j in range(5):
+        for k in range(5):
+            if z_throughput_count[i][j][k] != 0:
+                z_throughput[i][j][k] /= z_throughput_count[i][j][k]
+            else: z_throughput[i][j][k] == -1
+
 torch.save({
     'target_net': target_net.state_dict(),
     'policy_net': policy_net.state_dict(),
@@ -369,6 +388,31 @@ torch.save({
 }, path + '/' + str)
 
 print('Complete')
+
+# heatmap by plt.pcolor()
+df1 = pd.DataFrame(data=z_throughput[0])
+df2 = pd.DataFrame(data=z_throughput[1])
+df3 = pd.DataFrame(data=z_throughput[2])
+df4 = pd.DataFrame(data=z_throughput[3])
+plt.figure()
+ax = sns.heatmap(df1)
+plt.title('z=1')
+plt.show()
+
+plt.figure()
+ax = sns.heatmap(df2)
+plt.title('z=2')
+plt.show()
+
+plt.figure()
+ax = sns.heatmap(df3)
+plt.title('z=3')
+plt.show()
+
+plt.figure()
+ax = sns.heatmap(df4)
+plt.title('z=4')
+plt.show()
 
 
 def get_mean(array, k):
@@ -383,6 +427,7 @@ def get_mean(array, k):
         means.append(sum / k)
     return means
 
+
 def make_list(episode, term):
     i = 0
     n = 0
@@ -394,7 +439,8 @@ def make_list(episode, term):
         n += 1
     return list
 
-plt.figure()
+
+'''plt.figure()
 d = {'episode': range(NUM_EPISODES),
      '1000 episode': make_list(NUM_EPISODES, 1000),
      'throughput count': throughput_counts}
@@ -446,7 +492,7 @@ plt.figure()
 plt.title('throughput count mean 1000')
 plt.xlabel('1000 episode')
 plt.ylabel('throughput count mean(0~20)')
-plt.plot(throughput_count_means1000)
+plt.plot(throughput_count_means1000)'''
 
 '''plt.figure()
 plt.title('reward')
@@ -454,7 +500,7 @@ plt.xlabel('step')
 plt.ylabel('Reward')
 plt.plot(rewards)'''
 
-reward_means = get_mean(rewards, STEPS)
+# reward_means = get_mean(rewards, STEPS)
 '''plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
@@ -468,12 +514,12 @@ plt.xlabel('50 episodes')
 plt.ylabel('Reward')
 plt.plot(reward_means50)'''
 
-reward_means1000 = get_mean(reward_means, 1000)
+'''reward_means1000 = get_mean(reward_means, 1000)
 plt.figure()
 plt.title('reward mean 1000')
 plt.xlabel('1000 episodes')
 plt.ylabel('Reward')
-plt.plot(reward_means1000)
+plt.plot(reward_means1000)'''
 
 '''plt.figure()
 plt.title('scheduler')
@@ -492,7 +538,6 @@ plt.title('loss')
 plt.xlabel('step')
 plt.ylabel('loss')
 plt.plot(losses)'''
-
 
 """def create_sphere(cx, cy, cz, r):
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
