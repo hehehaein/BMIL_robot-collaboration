@@ -372,7 +372,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         z_throughput[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += throughput_count
         z_throughput_count[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += 1
 
-
+print(z_throughput_count)
 for i in range(4):
     for j in range(5):
         for k in range(5):
@@ -394,27 +394,45 @@ df1 = pd.DataFrame(data=z_throughput[0])
 df2 = pd.DataFrame(data=z_throughput[1])
 df3 = pd.DataFrame(data=z_throughput[2])
 df4 = pd.DataFrame(data=z_throughput[3])
+df1_count = pd.DataFrame(data=z_throughput_count[0])
+df2_count = pd.DataFrame(data=z_throughput_count[1])
+df3_count = pd.DataFrame(data=z_throughput_count[2])
+df4_count = pd.DataFrame(data=z_throughput_count[3])
+
 plt.figure()
-ax = sns.heatmap(df1)
+ax = sns.heatmap(df1, annot=True, vmin=0, vmax=20)
 plt.title('z=1')
-plt.show()
 
 plt.figure()
-ax = sns.heatmap(df2)
+ax = sns.heatmap(df2, annot=True, vmin=0, vmax=20)
 plt.title('z=2')
-plt.show()
 
 plt.figure()
-ax = sns.heatmap(df3)
+ax = sns.heatmap(df3, annot=True, vmin=0, vmax=20)
 plt.title('z=3')
-plt.show()
 
 plt.figure()
-ax = sns.heatmap(df4)
+ax = sns.heatmap(df4, annot=True, vmin=0, vmax=20)
 plt.title('z=4')
+'''======================z_count======================'''
+plt.figure()
+ax = sns.heatmap(df1_count, annot=True, vmin=0, vmax=3000)
+plt.title('z_count=1')
+
+plt.figure()
+ax = sns.heatmap(df2_count, annot=True, vmin=0, vmax=3000)
+plt.title('z_count=2')
+
+plt.figure()
+ax = sns.heatmap(df3_count, annot=True, vmin=0, vmax=3000)
+plt.title('z_count=3')
+
+plt.figure()
+ax = sns.heatmap(df4_count, annot=True, vmin=0, vmax=3000)
+plt.title('z_count=4')
 plt.show()
 
-
+'''
 def get_mean(array, k):
     means = []
     m = k
@@ -440,7 +458,7 @@ def make_list(episode, term):
     return list
 
 
-'''plt.figure()
+plt.figure()
 d = {'episode': range(NUM_EPISODES),
      '1000 episode': make_list(NUM_EPISODES, 1000),
      'throughput count': throughput_counts}
@@ -472,12 +490,40 @@ plt.xlabel('episode')
 plt.ylabel('count')
 plt.plot(stay_count)
 
-throughput_means1000 = get_mean(throughputs, 1000)
+throughput_count_means1000 = get_mean(throughput_counts, 1000)
+plt.figure()
+plt.title('throughput count')
+plt.xlabel('1000 episode')
+plt.ylabel('throughput count mean(0~20)')
+plt.plot(throughput_count)
+
+reward_means = get_mean(rewards, STEPS)
+
+reward_means1000 = get_mean(reward_means, 1000)
+plt.figure()
+plt.title('reward mean 1000')
+plt.xlabel('1000 episodes')
+plt.ylabel('Reward')
+plt.plot(reward_means1000)
+
+plt.figure()
+plt.title('eps')
+plt.xlabel('step')
+plt.ylabel('epsilon')
+plt.plot(epslions)
+
+plt.figure()
+plt.title('loss')
+plt.xlabel('step')
+plt.ylabel('loss')
+plt.plot(losses)'''
+
+'''throughput_means1000 = get_mean(throughputs, 1000)
 plt.figure()
 plt.title('throughput value mean 1000')
 plt.xlabel('1000 episode')
 plt.ylabel('throughput value mean(0/6.333)')
-plt.plot(throughput_means1000)
+plt.plot(throughput_means1000)'''
 
 """plt.figure()
 plt.title('throughput')
@@ -487,12 +533,7 @@ x_values = list(range(throughputs.__len__()))
 y_values = [y for y in throughputs]
 plt.scatter(x_values, y_values, s=40)"""
 
-throughput_count_means1000 = get_mean(throughput_counts, 1000)
-plt.figure()
-plt.title('throughput count mean 1000')
-plt.xlabel('1000 episode')
-plt.ylabel('throughput count mean(0~20)')
-plt.plot(throughput_count_means1000)'''
+
 
 '''plt.figure()
 plt.title('reward')
@@ -500,7 +541,7 @@ plt.xlabel('step')
 plt.ylabel('Reward')
 plt.plot(rewards)'''
 
-# reward_means = get_mean(rewards, STEPS)
+
 '''plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
@@ -514,12 +555,7 @@ plt.xlabel('50 episodes')
 plt.ylabel('Reward')
 plt.plot(reward_means50)'''
 
-'''reward_means1000 = get_mean(reward_means, 1000)
-plt.figure()
-plt.title('reward mean 1000')
-plt.xlabel('1000 episodes')
-plt.ylabel('Reward')
-plt.plot(reward_means1000)'''
+
 
 '''plt.figure()
 plt.title('scheduler')
@@ -527,17 +563,6 @@ plt.xlabel('episode')
 plt.ylabel('lr')
 plt.plot(scheduler_lrs)'''
 
-'''plt.figure()
-plt.title('eps')
-plt.xlabel('step')
-plt.ylabel('epsilon')
-plt.plot(epslions)
-
-plt.figure()
-plt.title('loss')
-plt.xlabel('step')
-plt.ylabel('loss')
-plt.plot(losses)'''
 
 """def create_sphere(cx, cy, cz, r):
     u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
