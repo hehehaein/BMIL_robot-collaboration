@@ -177,14 +177,13 @@ class My_DQN(gym.Env):
         relay_node.append(y)
         relay_node.append(z)
         relay_node.append(r)
-
         state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):
             state_set[0][i] = copy.deepcopy(relay_node[i])  # 릴레이노드
             state_set[1][i] = copy.deepcopy(self.agent2[i])
             state_set[2][i] = copy.deepcopy(self.source[i])
             state_set[3][i] = copy.deepcopy(self.dest[i])
-        state_set[0][2] = self.MIN_HEIGHT
+        #state_set[0][2] = self.MIN_HEIGHT
         state_set[0][3] = 2
         state_set = state_set.flatten()
 

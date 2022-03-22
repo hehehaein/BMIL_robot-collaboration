@@ -23,7 +23,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import torch.nn as L
 
 
 from tqdm import tqdm
@@ -77,14 +76,20 @@ class DQN(nn.Module):
         self.linear1 = nn.Linear(16, 32)
         self.linear2 = nn.Linear(32, 64)
         self.linear3 = nn.Linear(64, 81)
+        nn.init.kaiming_uniform(self.linear1.weight, mode='fan_in', nonlinearity='leaky_relu')
+        nn.init.kaiming_uniform(self.linear2.weight, mode='fan_in', nonlinearity='leaky_relu')
+        nn.init.kaiming_uniform(self.linear3.weight, mode='fan_in', nonlinearity='leaky_relu')
 
     # 최적화 중에 다음 행동을 결정하기 위해서 하나의 요소 또는 배치를 이용해 호촐됩니다.
     # ([[left0exp,right0exp]...]) 를 반환합니다.
     def forward(self, x):
         # x = x.to(device)
         # print('forward\n',x)
-        x = L.LeakyReLU(self.linear1(x))
-        x = L.LeakyReLU(self.linear2(x))
+        m = nn.LeakyReLU(0.2)
+        x = m(self.linear1(x))
+        x = m(self.linear2(x))
+        '''x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))'''
         return self.linear3(x)
 
 
@@ -95,11 +100,11 @@ DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
-TARGET_UPDATE = 10
-UPDATE_FREQ = 10
+TARGET_UPDATE = 40
+UPDATE_FREQ = 20
 BUFFER = 100000
 LEARNING_RATE = 1e-4
-IS_DOUBLE_Q =  True
+IS_DOUBLE_Q = True
 ZERO = False
 SCHEDULER = False
 SCHEDULER_GAMMA = 0.95
@@ -131,7 +136,6 @@ trainer = Trainer(callbacks=[earlystop])
 
 def select_action(state):
     global steps_done
-
     # 멈춰있는 action 확률 키우기
     a1 = []  # 빈 리스트 생성
     a2 = []
@@ -171,7 +175,6 @@ def select_action(state):
 losses = []
 scheduler_lrs = []
 scheduler_check = False
-
 
 def optimize_model():
     if len(memory) < BATCH_SIZE:
@@ -249,23 +252,25 @@ z_throughput = np.zeros((4, 5, 5))
 z_throughput_count = np.zeros((4, 5, 5))
 distribution = np.zeros((4, 5, 5))
 reward_count = 0
-move_count = 0
-maxes = []
 optimal = 0
-stay = 0
+maxes = []
 opti_count = []
 stay_count = []
-move_count = 0
 for i_episode in tqdm(range(NUM_EPISODES)):
-    # 환경과 상태 초기화
-    state = env.reset()
-    state = torch.Tensor(state)
     throughput_count = 0
-    max_count = 0
     # optimal = 0
     stay = 0
     move_count = 0
     max_count = 0
+
+    # 환경과 상태 초기화
+    state = env.reset()
+    state = torch.Tensor(state)
+
+    # distribution print
+    distribution[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += 1
+    state_for_save = state
+
     if SCHEDULER and i_episode == NUM_EPISODES // 2:
         scheduler_check = True
     for t in range(0, STEPS, 1):
@@ -278,6 +283,8 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         next_state, reward, done, last_set = env.step(action.item())
 
         state_reshape = np.reshape(state, (env.N + 2, 4))
+
+
         next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
 
         if next_state_reshape[0][0] == 1 and \
@@ -303,10 +310,10 @@ for i_episode in tqdm(range(NUM_EPISODES)):
             throughput_count += 1
 
         throughputs.append(last_set[0])
-        '''foots.append(last_set[1])
+        foots.append(last_set[1])
         disperses.append(last_set[2])
         moves.append(last_set[3])
-        txrs.append(last_set[4])'''
+        txrs.append(last_set[4])
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
@@ -370,12 +377,12 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
-    #distribution print
-    distribution[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += 1
+
+    # print(state[0],state[1],state[2],state[3])
     # z축기준 평면위치에 따른 throughput count 평균
-    if (NUM_EPISODES/2 < i_episode):
-        z_throughput[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += throughput_count
-        z_throughput_count[state[2].int().item()-1][state[0].int().item()][state[1].int().item()] += 1
+    if (NUM_EPISODES / 2 < i_episode):
+        z_throughput[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += throughput_count
+        z_throughput_count[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += 1
 
 print(z_throughput_count)
 for i in range(4):
@@ -411,48 +418,48 @@ df3_count = pd.DataFrame(data=z_throughput_count[2])
 df4_count = pd.DataFrame(data=z_throughput_count[3])
 
 plt.figure()
-ax = sns.heatmap(df1, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
+ax = sns.heatmap(df1, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
 plt.title('z=1')
 
 plt.figure()
-ax = sns.heatmap(df2, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
+ax = sns.heatmap(df2, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
 plt.title('z=2')
 
 plt.figure()
-ax = sns.heatmap(df3, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
+ax = sns.heatmap(df3, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
 plt.title('z=3')
 
 plt.figure()
-ax = sns.heatmap(df4, cmap='coolwarm', annot=True, vmin=0, vmax=0.40)
+ax = sns.heatmap(df4, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
 plt.title('z=4')
-'''======================z_count======================'''
+'''===================================z_count==================================='''
 plt.figure()
-ax = sns.heatmap(df1_count, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(df1_count, annot=True)
 plt.title('z_count=1')
 
 plt.figure()
-ax = sns.heatmap(df2_count, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(df2_count, annot=True)
 plt.title('z_count=2')
 
 plt.figure()
-ax = sns.heatmap(df3_count, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(df3_count, annot=True)
 plt.title('z_count=3')
-
+'''===================================distribution=================================='''
 plt.figure()
-ax = sns.heatmap(df4_count, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(df4_count, annot=True)
 plt.title('z_count=4')
 
 plt.figure()
-ax = sns.heatmap(dis1, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(dis1, annot=True)
 plt.title('dis1')
 plt.figure()
-ax = sns.heatmap(dis2, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(dis2, annot=True)
 plt.title('dis2')
 plt.figure()
-ax = sns.heatmap(dis3, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(dis3, annot=True)
 plt.title('dis3')
 plt.figure()
-ax = sns.heatmap(dis4, annot=True, vmin=0, vmax=3000)
+ax = sns.heatmap(dis4, annot=True)
 plt.title('dis4')
 plt.show()
 
