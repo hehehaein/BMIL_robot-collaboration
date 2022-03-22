@@ -96,7 +96,7 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 128000
+NUM_EPISODES = 32000
 STEPS = 20
 DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
@@ -254,7 +254,7 @@ scatters_tail = []'''
 z_throughput = np.zeros((4, 5, 5)) # 한 에피소드당 throughput값를 z에 대한 시작위치에다가 1 저장
 z_throughput_count = np.zeros((4, 5, 5)) # throughput이 연결되는 z에 대한 해당위치에 몇변 가는지
 z_txr_optimal = np.zeros((16, 5, 5)) # s_(t+1)이 optimal한 위치이면 count
-z_txr_optimal_visit = np.zeros((16, 5, 5))
+z_txr_visit = np.zeros((16, 5, 5))
 z_txr_reward = np.zeros((16, 5, 5)) # reward plot
 z_txr_reward_visit = np.zeros((16, 5, 5)) # reward plot
 distribution = np.zeros((4, 5, 5)) # 시작위치가 골고루 분포해서 생성되는지 확인
@@ -271,8 +271,8 @@ for i_episode in tqdm(range(NUM_EPISODES)):
 
     # distribution print
     #distribution[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += 1
-    z_txr_page = ((state[2].int().item() - 1)*4)+state[3].int().item()
-    z_txr_optimal_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
+    z_txr_page = ((state[2].int().item() - 1)*4+state[3]).int().item()
+    z_txr_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
     state_for_save = state
 
     if SCHEDULER and i_episode == NUM_EPISODES // 2:
@@ -289,7 +289,6 @@ for i_episode in tqdm(range(NUM_EPISODES)):
 
         state_reshape = np.reshape(state, (env.N + 2, 4))
         next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
-
         if next_state_reshape[0][0] == 1 and \
                 next_state_reshape[0][1] == 1 and \
                 next_state_reshape[0][2] == 1 and \
@@ -387,14 +386,14 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     throughput_counts.append(throughput_count)
 
     # 학습후 state에 대한 th연결횟수/state 방문횟수
-    if (NUM_EPISODES / 2 < i_episode) and to_optimal:
-        z_txr_optimal[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += to_optimal
+    if (NUM_EPISODES / 2) < i_episode:
+        z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += to_optimal
     for i in range(16):
         for j in range(5):
             for k in range(5):
-                if z_txr_optimal_visit[i][j][k] != 0:
-                        z_txr_optimal[i][j][k] /= z_txr_optimal_visit[i][j][k]
-                        z_txr_reward[i][j][k] /= z_txr_optimal_visit[i][j][k]
+                if z_txr_visit[i][j][k] != 0:
+                        z_txr_optimal[i][j][k] /= z_txr_visit[i][j][k]
+                        z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]
 
     # z축기준 평면위치에 따른 throughput count 평균
     '''if (NUM_EPISODES / 2 < i_episode):
@@ -435,17 +434,17 @@ for i in range(4):
     plt.title('dis = {0}'.format(i))'''
 for i in range(16):
     opt = pd.DataFrame(data=z_txr_optimal[i])
-    visit = pd.DataFrame(data=z_txr_optimal_visit[i])
+    visit = pd.DataFrame(data=z_txr_visit[i])
     reward = pd.DataFrame(data=z_txr_reward[i])
     plt.figure()
-    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
-    plt.title('optimal = {0},{1}'.format(i//4+1, i%4))
+    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True, vmin=-3, vmax=2)
+    plt.title('optimal : z = {0}, txr = {1}'.format(i//4+1, i%4))
     plt.figure()
-    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
-    plt.title('total visit = {0},{1}'.format(i//4+1, i%4))
+    ax = sns.heatmap(visit, cmap='YlGnBu', annot=True)
+    plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))
     plt.figure()
     ax = sns.heatmap(reward, cmap='YlGnBu', annot=True)
-    plt.title('reward = {0},{1}'.format(i//4+1, i%4))
+    plt.title('reward : z = {0}, txr = {1}'.format(i//4+1, i%4))
 plt.show()
 
 '''

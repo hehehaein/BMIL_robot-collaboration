@@ -184,7 +184,7 @@ class My_DQN(gym.Env):
             state_set[2][i] = copy.deepcopy(self.source[i])
             state_set[3][i] = copy.deepcopy(self.dest[i])
         #state_set[0][2] = self.MIN_HEIGHT
-        state_set[0][3] = 2
+        #state_set[0][3] = 2
         state_set = state_set.flatten()
 
         self.state = state_set
