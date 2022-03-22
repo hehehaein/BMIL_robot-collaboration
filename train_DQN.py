@@ -102,8 +102,8 @@ DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
-TARGET_UPDATE = 20
-UPDATE_FREQ = 10
+TARGET_UPDATE = 40
+UPDATE_FREQ = 20
 BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = True
@@ -243,34 +243,35 @@ foots = []
 disperses = []
 moves = []
 txrs = []
-throughput_counts = []
+throughput_counts = [] #한 에피소드당 throughput 연결횟수
 rewards = []
-stay_count = []
+stay_count = [] #한 에피소드당 optimal 위치에 머무는 횟수
+opti_count = [] #optimal한 위치에 가는 횟수
 '''scatters_front = []
 scatters_middle = []
 scatters_tail = []'''
 
-z_throughput = np.zeros((4, 5, 5))
-z_throughput_count = np.zeros((4, 5, 5))
-distribution = np.zeros((4, 5, 5))
+z_throughput = np.zeros((4, 5, 5)) # 한 에피소드당 throughput값를 z에 대한 시작위치에다가 1 저장
+z_throughput_count = np.zeros((4, 5, 5)) # throughput이 연결되는 z에 대한 해당위치에 몇변 가는지
+z_txr_optimal = np.zeros((16, 5, 5)) # s_(t+1)이 optimal한 위치이면 count
+z_txr_optimal_visit = np.zeros((16, 5, 5))
+z_txr_reward = np.zeros((16, 5, 5)) # reward plot
+distribution = np.zeros((4, 5, 5)) # 시작위치가 골고루 분포해서 생성되는지 확인
 reward_count = 0
 optimal = 0
-maxes = []
-opti_count = []
-stay_count = []
 for i_episode in tqdm(range(NUM_EPISODES)):
-    throughput_count = 0
+    throughput_count = 0 #한 에피소드당 throghput이 연결되는 횟수
     # optimal = 0
     stay = 0
-    move_count = 0
-    max_count = 0
-
+    move_count = 0 # 몇 스텝 갔는지 확인용
     # 환경과 상태 초기화
     state = env.reset()
     state = torch.Tensor(state)
 
     # distribution print
-    distribution[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += 1
+    #distribution[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += 1
+    z_txr_page = ((state[2].int().item() - 1)*4)+state[3].int().item()
+    z_txr_optimal_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
     state_for_save = state
 
     if SCHEDULER and i_episode == NUM_EPISODES // 2:
@@ -278,6 +279,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     for t in range(0, STEPS, 1):
         move_count += 1
         throughput_value = 0
+        to_optimal = 0
 
         # 행동 선택과 수행
         action = select_action(state)
@@ -285,19 +287,22 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         next_state, reward, done, last_set = env.step(action.item())
 
         state_reshape = np.reshape(state, (env.N + 2, 4))
-
-
         next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
 
         if next_state_reshape[0][0] == 1 and \
                 next_state_reshape[0][1] == 1 and \
                 next_state_reshape[0][2] == 1 and \
                 next_state_reshape[0][3] == 3:
+            to_optimal += 1
+
+        '''if next_state_reshape[0][0] == 1 and \
+                next_state_reshape[0][1] == 1 and \
+                next_state_reshape[0][2] == 1 and \
+                next_state_reshape[0][3] == 3:
             if np.array_equal(next_state_reshape, state_reshape):
-                stay += 1
+                stay += 1'''
 
         if reward > 6.8:
-            max_count += 1
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d reward:%.6f count:%2d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
@@ -311,13 +316,15 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         if last_set[0] != 0:
             throughput_count += 1
 
-        throughputs.append(last_set[0])
+        '''throughputs.append(last_set[0])
         foots.append(last_set[1])
         disperses.append(last_set[2])
         moves.append(last_set[3])
-        txrs.append(last_set[4])
+        txrs.append(last_set[4])'''
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
+
+        z_txr_reward[z_txr_page][state[0].int().item()][state[1].int().item()] += reward - last_set[3]
 
         # 3D plot
         '''if i_episode == (num_episodes - 1):
@@ -379,10 +386,17 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
+    # 학습후 state에 대한 th연결횟수/state 방문횟수
+    if (NUM_EPISODES / 2 < i_episode) and to_optimal:
+        z_txr_optimal[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += to_optimal
+    for i in range(16):
+        for j in range(5):
+            for k in range(5):
+                if z_txr_optimal_visit[i][j][k] != 0:
+                        z_txr_optimal[i][j][k] /= z_txr_optimal_visit[i][j][k]
 
-    # print(state[0],state[1],state[2],state[3])
     # z축기준 평면위치에 따른 throughput count 평균
-    if (NUM_EPISODES / 2 < i_episode):
+    '''if (NUM_EPISODES / 2 < i_episode):
         z_throughput[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += throughput_count
         z_throughput_count[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += 1
 
@@ -391,8 +405,7 @@ for i in range(4):
     for j in range(5):
         for k in range(5):
             if z_throughput_count[i][j][k] != 0:
-                z_throughput[i][j][k] /= z_throughput_count[i][j][k]
-            else: z_throughput[i][j][k] == -1
+                z_throughput[i][j][k] /= z_throughput_count[i][j][k]'''
 
 torch.save({
     'target_net': target_net.state_dict(),
@@ -404,7 +417,36 @@ torch.save({
 print('Complete')
 
 # heatmap by plt.pcolor()
-df1 = pd.DataFrame(data=z_throughput[0])
+for i in range(4):
+    df = pd.DataFrame(data=z_throughput[i])
+    plt.figure()
+    ax = sns.heatmap(df, annot=True, vmin=0, vmax=0.2)
+    plt.title('z = {0}'.format(i))
+for i in range(4):
+    df_count = pd.DataFrame(data=z_throughput_count[i])
+    plt.figure()
+    ax = sns.heatmap(df_count, cmap='coolwarm', annot=True)
+    plt.title('z throughput count = {0}'.format(i+1))
+for i in range(4):
+    dis = pd.DataFrame(data=distribution[i])
+    plt.figure()
+    ax = sns.heatmap(dis, annot=True, vmin=0, vmax=0.2)
+    plt.title('dis = {0}'.format(i))
+for i in range(16):
+    opt = pd.DataFrame(data=z_txr_optimal[i])
+    visit = pd.DataFrame(data=z_txr_optimal_visit[i])
+
+    plt.figure()
+    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
+    plt.title('optimal = {0}'.format(i))
+    plt.figure()
+    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
+    plt.title('total visit = {0}'.format(i))
+    plt.figure()
+    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
+    plt.title('optimal = {0}'.format(i))
+
+'''df1 = pd.DataFrame(data=z_throughput[0])
 df2 = pd.DataFrame(data=z_throughput[1])
 df3 = pd.DataFrame(data=z_throughput[2])
 df4 = pd.DataFrame(data=z_throughput[3])
@@ -434,7 +476,7 @@ plt.title('z=3')
 plt.figure()
 ax = sns.heatmap(df4, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
 plt.title('z=4')
-'''===================================z_count==================================='''
+#===================================z_count===================================
 plt.figure()
 ax = sns.heatmap(df1_count, annot=True)
 plt.title('z_count=1')
@@ -446,7 +488,7 @@ plt.title('z_count=2')
 plt.figure()
 ax = sns.heatmap(df3_count, annot=True)
 plt.title('z_count=3')
-'''===================================distribution=================================='''
+#===================================distribution==================================
 plt.figure()
 ax = sns.heatmap(df4_count, annot=True)
 plt.title('z_count=4')
@@ -463,7 +505,7 @@ plt.title('dis3')
 plt.figure()
 ax = sns.heatmap(dis4, annot=True)
 plt.title('dis4')
-plt.show()
+plt.show()'''
 
 '''
 def get_mean(array, k):
@@ -645,18 +687,19 @@ plt.show()'''
 env.close()
 plt.ioff()
 plt.show()
-print('NUM_EPISODES', NUM_EPISODES)
-print('STEPS', STEPS)
-print('DISCOUNT_FACTOR', DISCOUNT_FACTOR)
-print('EPS_DECAY',EPS_DECAY)
-print('TARGET_UPDATE', TARGET_UPDATE)
-print('UPDATE_FREQ', UPDATE_FREQ)
-print('BIFFER', BUFFER)
-print('LEARNING_RATE', LEARNING_RATE)
-print('seed', seed)
-print('IS_DOUBLE', IS_DOUBLE_Q)
-print('ZERO', ZERO)
-print('SCJEDULER', SCHEDULER)
-print('SCJEDULER', SCHEDULER_GAMMA)
-print('HE', HE)
-print('ACTIV', ACTIV)
+print('seed  ', seed)
+print('BUFFER  ', BUFFER)
+print('HE  ', HE)
+print('ACTIV  ', ACTIV)
+print('ZERO  ', ZERO)
+print('IS_DOUBLE  ', IS_DOUBLE_Q)
+print('SCHEDULER  ', SCHEDULER)
+print('SCH_GAMMA  ', SCHEDULER_GAMMA)
+print('STEPS  ', STEPS)
+print('EPISODES  ', NUM_EPISODES)
+print('EPS_DECAY  ',EPS_DECAY)
+print('UPDATE_FREQ  ', UPDATE_FREQ)
+print('TARGET_UPDATE  ', TARGET_UPDATE)
+print('DISCOUNT_FACTOR  ', DISCOUNT_FACTOR)
+print('LEARNING_RATE  ', LEARNING_RATE)
+
