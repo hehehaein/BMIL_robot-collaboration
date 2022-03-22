@@ -68,6 +68,8 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
+HE = 'False'
+ACTIV = 'False'
 
 class DQN(nn.Module):
 
@@ -76,20 +78,20 @@ class DQN(nn.Module):
         self.linear1 = nn.Linear(16, 32)
         self.linear2 = nn.Linear(32, 64)
         self.linear3 = nn.Linear(64, 81)
-        nn.init.kaiming_uniform(self.linear1.weight, mode='fan_in', nonlinearity='leaky_relu')
-        nn.init.kaiming_uniform(self.linear2.weight, mode='fan_in', nonlinearity='leaky_relu')
-        nn.init.kaiming_uniform(self.linear3.weight, mode='fan_in', nonlinearity='leaky_relu')
+        '''nn.init.kaiming_normal_(self.linear1.weight, mode='fan_in', nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(self.linear2.weight, mode='fan_in', nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(self.linear3.weight, mode='fan_in', nonlinearity='leaky_relu')'''
 
     # 최적화 중에 다음 행동을 결정하기 위해서 하나의 요소 또는 배치를 이용해 호촐됩니다.
     # ([[left0exp,right0exp]...]) 를 반환합니다.
     def forward(self, x):
         # x = x.to(device)
         # print('forward\n',x)
-        m = nn.LeakyReLU(0.2)
+        '''m = nn.LeakyReLU(0.2)
         x = m(self.linear1(x))
-        x = m(self.linear2(x))
-        '''x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))'''
+        x = m(self.linear2(x))'''
+        x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))
         return self.linear3(x)
 
 
@@ -100,8 +102,8 @@ DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
 EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
-TARGET_UPDATE = 40
-UPDATE_FREQ = 20
+TARGET_UPDATE = 20
+UPDATE_FREQ = 10
 BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = True
@@ -643,3 +645,18 @@ plt.show()'''
 env.close()
 plt.ioff()
 plt.show()
+print('NUM_EPISODES', NUM_EPISODES)
+print('STEPS', STEPS)
+print('DISCOUNT_FACTOR', DISCOUNT_FACTOR)
+print('EPS_DECAY',EPS_DECAY)
+print('TARGET_UPDATE', TARGET_UPDATE)
+print('UPDATE_FREQ', UPDATE_FREQ)
+print('BIFFER', BUFFER)
+print('LEARNING_RATE', LEARNING_RATE)
+print('seed', seed)
+print('IS_DOUBLE', IS_DOUBLE_Q)
+print('ZERO', ZERO)
+print('SCJEDULER', SCHEDULER)
+print('SCJEDULER', SCHEDULER_GAMMA)
+print('HE', HE)
+print('ACTIV', ACTIV)
