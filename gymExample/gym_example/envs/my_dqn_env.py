@@ -252,7 +252,8 @@ class My_DQN(gym.Env):
         self.last_set[3] = e_move
         self.last_set[4] = e_txr
 
-        self.reward = env.cal_reward(self.throughput, foot, dispersed, e_move, e_txr)
+        self.reward = env.cal_reward(self.throughput, foot, dispersed
+                                     , e_move, e_txr)
         try:
             assert self.observation_space.contains(self.next_state)
         except AssertionError:

@@ -68,8 +68,8 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
-HE = 'False'
-ACTIV = 'False'
+HE = 'kaiming_uniform'
+ACTIV = 'LeakyRelu0.1'
 
 class DQN(nn.Module):
 
@@ -78,20 +78,20 @@ class DQN(nn.Module):
         self.linear1 = nn.Linear(16, 32)
         self.linear2 = nn.Linear(32, 64)
         self.linear3 = nn.Linear(64, 81)
-        '''nn.init.kaiming_normal_(self.linear1.weight, mode='fan_in', nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(self.linear1.weight, mode='fan_in', nonlinearity='leaky_relu')
         nn.init.kaiming_normal_(self.linear2.weight, mode='fan_in', nonlinearity='leaky_relu')
-        nn.init.kaiming_normal_(self.linear3.weight, mode='fan_in', nonlinearity='leaky_relu')'''
+        nn.init.kaiming_normal_(self.linear3.weight, mode='fan_in', nonlinearity='leaky_relu')
 
     # 최적화 중에 다음 행동을 결정하기 위해서 하나의 요소 또는 배치를 이용해 호촐됩니다.
     # ([[left0exp,right0exp]...]) 를 반환합니다.
     def forward(self, x):
         # x = x.to(device)
         # print('forward\n',x)
-        '''m = nn.LeakyReLU(0.2)
+        m = nn.LeakyReLU(0.1)
         x = m(self.linear1(x))
-        x = m(self.linear2(x))'''
-        x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))
+        x = m(self.linear2(x))
+        '''x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))'''
         return self.linear3(x)
 
 
@@ -256,6 +256,7 @@ z_throughput_count = np.zeros((4, 5, 5)) # throughput이 연결되는 z에 대�
 z_txr_optimal = np.zeros((16, 5, 5)) # s_(t+1)이 optimal한 위치이면 count
 z_txr_optimal_visit = np.zeros((16, 5, 5))
 z_txr_reward = np.zeros((16, 5, 5)) # reward plot
+z_txr_reward_visit = np.zeros((16, 5, 5)) # reward plot
 distribution = np.zeros((4, 5, 5)) # 시작위치가 골고루 분포해서 생성되는지 확인
 reward_count = 0
 optimal = 0
@@ -325,7 +326,6 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         reward = torch.tensor([reward], device=device)
 
         z_txr_reward[z_txr_page][state[0].int().item()][state[1].int().item()] += reward - last_set[3]
-
         # 3D plot
         '''if i_episode == (num_episodes - 1):
             scatters_tail.append(np.array(next_state_reshape[0]))
@@ -394,6 +394,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
             for k in range(5):
                 if z_txr_optimal_visit[i][j][k] != 0:
                         z_txr_optimal[i][j][k] /= z_txr_optimal_visit[i][j][k]
+                        z_txr_reward[i][j][k] /= z_txr_optimal_visit[i][j][k]
 
     # z축기준 평면위치에 따른 throughput count 평균
     '''if (NUM_EPISODES / 2 < i_episode):
@@ -417,7 +418,7 @@ torch.save({
 print('Complete')
 
 # heatmap by plt.pcolor()
-for i in range(4):
+'''for i in range(4):
     df = pd.DataFrame(data=z_throughput[i])
     plt.figure()
     ax = sns.heatmap(df, annot=True, vmin=0, vmax=0.2)
@@ -431,81 +432,21 @@ for i in range(4):
     dis = pd.DataFrame(data=distribution[i])
     plt.figure()
     ax = sns.heatmap(dis, annot=True, vmin=0, vmax=0.2)
-    plt.title('dis = {0}'.format(i))
+    plt.title('dis = {0}'.format(i))'''
 for i in range(16):
     opt = pd.DataFrame(data=z_txr_optimal[i])
     visit = pd.DataFrame(data=z_txr_optimal_visit[i])
-
+    reward = pd.DataFrame(data=z_txr_reward[i])
     plt.figure()
     ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
-    plt.title('optimal = {0}'.format(i))
+    plt.title('optimal = {0},{1}'.format(i//4+1, i%4))
     plt.figure()
     ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
-    plt.title('total visit = {0}'.format(i))
+    plt.title('total visit = {0},{1}'.format(i//4+1, i%4))
     plt.figure()
-    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
-    plt.title('optimal = {0}'.format(i))
-
-'''df1 = pd.DataFrame(data=z_throughput[0])
-df2 = pd.DataFrame(data=z_throughput[1])
-df3 = pd.DataFrame(data=z_throughput[2])
-df4 = pd.DataFrame(data=z_throughput[3])
-
-dis1 = pd.DataFrame(data=distribution[0])
-dis2 = pd.DataFrame(data=distribution[1])
-dis3 = pd.DataFrame(data=distribution[2])
-dis4 = pd.DataFrame(data=distribution[3])
-
-df1_count = pd.DataFrame(data=z_throughput_count[0])
-df2_count = pd.DataFrame(data=z_throughput_count[1])
-df3_count = pd.DataFrame(data=z_throughput_count[2])
-df4_count = pd.DataFrame(data=z_throughput_count[3])
-
-plt.figure()
-ax = sns.heatmap(df1, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
-plt.title('z=1')
-
-plt.figure()
-ax = sns.heatmap(df2, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
-plt.title('z=2')
-
-plt.figure()
-ax = sns.heatmap(df3, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
-plt.title('z=3')
-
-plt.figure()
-ax = sns.heatmap(df4, cmap='coolwarm', annot=True, vmin=0, vmax=0.2)
-plt.title('z=4')
-#===================================z_count===================================
-plt.figure()
-ax = sns.heatmap(df1_count, annot=True)
-plt.title('z_count=1')
-
-plt.figure()
-ax = sns.heatmap(df2_count, annot=True)
-plt.title('z_count=2')
-
-plt.figure()
-ax = sns.heatmap(df3_count, annot=True)
-plt.title('z_count=3')
-#===================================distribution==================================
-plt.figure()
-ax = sns.heatmap(df4_count, annot=True)
-plt.title('z_count=4')
-
-plt.figure()
-ax = sns.heatmap(dis1, annot=True)
-plt.title('dis1')
-plt.figure()
-ax = sns.heatmap(dis2, annot=True)
-plt.title('dis2')
-plt.figure()
-ax = sns.heatmap(dis3, annot=True)
-plt.title('dis3')
-plt.figure()
-ax = sns.heatmap(dis4, annot=True)
-plt.title('dis4')
-plt.show()'''
+    ax = sns.heatmap(reward, cmap='YlGnBu', annot=True)
+    plt.title('reward = {0},{1}'.format(i//4+1, i%4))
+plt.show()
 
 '''
 def get_mean(array, k):
