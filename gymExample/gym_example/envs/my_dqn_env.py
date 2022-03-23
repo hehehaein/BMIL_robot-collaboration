@@ -120,7 +120,7 @@ class reward_set:
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
         u = 8  # constant that guarantees the reward to be non-negative
         foot_coeffi = 1/2
-        reward = u + (throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
+        reward = u + (foot_coeffi*throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
         return reward
 
 class My_DQN(gym.Env):
