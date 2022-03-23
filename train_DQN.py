@@ -96,7 +96,7 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 32000
+NUM_EPISODES = 128000
 STEPS = 20
 DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
@@ -126,16 +126,14 @@ tmp_net = DQN().to(device)
 
 target_net.eval()
 optimizer = optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
-if SCHEDULER:
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=SCHEDULER_GAMMA)
 memory = ReplayMemory(BUFFER)
+'''if SCHEDULER:
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=SCHEDULER_GAMMA)'''
+'''earlystop = EarlyStopping(monitor='val_loss', patience=5, verbose=True, mode='min')
+trainer = Trainer(callbacks=[earlystop])'''
 
-steps_done = 0
 epslions = []
-earlystop = EarlyStopping(monitor='val_loss', patience=5, verbose=True, mode='min')
-trainer = Trainer(callbacks=[earlystop])
-
-
+steps_done = 0
 def select_action(state):
     global steps_done
     # 멈춰있는 action 확률 키우기
@@ -162,22 +160,21 @@ def select_action(state):
             # 기대 보상이 더 큰 행동을 선택할 수 있습니다.
             return policy_net(state).max(-1)[1].view(1, 1)
     else:
-        if ZERO:
+
+        if ZERO: # action이 0일 확률을 키우는 경우
             if (20 * STEPS * NUM_EPISODES) * 0.5 * 0.66 < steps_done:
                 return torch.tensor([random.choices(range(0, n_actions), weights=a3)], device=device, dtype=torch.long)
             elif (20 * STEPS * NUM_EPISODES) * 0.5 * 0.33 < steps_done:
                 return torch.tensor([random.choices(range(0, n_actions), weights=a2)], device=device, dtype=torch.long)
             else:
                 return torch.tensor([random.choices(range(0, n_actions), weights=a1)], device=device, dtype=torch.long)
-        else:
+        else: #모두 같은 확률일 경우
             return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
 
-
-# 최적화의 한 단계를 수행함
 losses = []
-scheduler_lrs = []
-scheduler_check = False
-
+'''scheduler_lrs = []
+scheduler_check = False'''
+# 최적화의 한 단계를 수행함
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
@@ -224,18 +221,14 @@ def optimize_model():
     optimizer.zero_grad()
     '''backward propagation'''
     loss.backward()
-
     for param in policy_net.parameters():
         param.grad.data.clamp_(-1, 1)
-
-    '''경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.'''
-    optimizer.step()
-    if scheduler_check:
+    optimizer.step() #경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.
+    '''if scheduler_check: #scheduler 실행, 값 그래프 뽑기
         scheduler.step()
         scheduler_lrs.append(scheduler.get_lr())
     else:
-        scheduler_lrs.append(LEARNING_RATE)
-
+        scheduler_lrs.append(LEARNING_RATE)'''
 
 actions = []
 throughputs = []
@@ -243,23 +236,22 @@ foots = []
 disperses = []
 moves = []
 txrs = []
-throughput_counts = [] #한 에피소드당 throughput 연결횟수
 rewards = []
+throughput_counts = [] #한 에피소드당 throughput 연결횟수
 stay_count = [] #한 에피소드당 optimal 위치에 머무는 횟수
-opti_count = [] #optimal한 위치에 가는 횟수
+opti_count = [] #한 에피소드당 optimal한 위치에 가는 횟수
 '''scatters_front = []
 scatters_middle = []
 scatters_tail = []'''
-
 z_throughput = np.zeros((4, 5, 5)) # 한 에피소드당 throughput값를 z에 대한 시작위치에다가 1 저장
 z_throughput_count = np.zeros((4, 5, 5)) # throughput이 연결되는 z에 대한 해당위치에 몇변 가는지
 z_txr_optimal = np.zeros((16, 5, 5)) # s_(t+1)이 optimal한 위치이면 count
 z_txr_visit = np.zeros((16, 5, 5))
 z_txr_reward = np.zeros((16, 5, 5)) # reward plot
-z_txr_reward_visit = np.zeros((16, 5, 5)) # reward plot
 distribution = np.zeros((4, 5, 5)) # 시작위치가 골고루 분포해서 생성되는지 확인
 reward_count = 0
 optimal = 0
+visit_reward_count = 0
 for i_episode in tqdm(range(NUM_EPISODES)):
     throughput_count = 0 #한 에피소드당 throghput이 연결되는 횟수
     # optimal = 0
@@ -270,9 +262,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     state = torch.Tensor(state)
 
     # distribution print
-    #distribution[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += 1
-    z_txr_page = ((state[2].int().item() - 1)*4+state[3]).int().item()
-    z_txr_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
+    distribution[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += 1
     state_for_save = state
 
     if SCHEDULER and i_episode == NUM_EPISODES // 2:
@@ -280,7 +270,6 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     for t in range(0, STEPS, 1):
         move_count += 1
         throughput_value = 0
-        to_optimal = 0
 
         # 행동 선택과 수행
         action = select_action(state)
@@ -289,11 +278,6 @@ for i_episode in tqdm(range(NUM_EPISODES)):
 
         state_reshape = np.reshape(state, (env.N + 2, 4))
         next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
-        if next_state_reshape[0][0] == 1 and \
-                next_state_reshape[0][1] == 1 and \
-                next_state_reshape[0][2] == 1 and \
-                next_state_reshape[0][3] == 3:
-            to_optimal += 1
 
         '''if next_state_reshape[0][0] == 1 and \
                 next_state_reshape[0][1] == 1 and \
@@ -302,7 +286,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
             if np.array_equal(next_state_reshape, state_reshape):
                 stay += 1'''
 
-        if reward > 6.8:
+        if reward > 13:
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d reward:%.6f count:%2d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
@@ -324,7 +308,15 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
-        z_txr_reward[z_txr_page][state[0].int().item()][state[1].int().item()] += reward - last_set[3]
+        if (NUM_EPISODES / 2) < i_episode:
+            z_txr_page = ((state[2].int().item() - 1) * 4 + state[3]).int().item()
+            z_txr_reward[z_txr_page][state[0].int().item()][state[1].int().item()] += reward - (last_set[3]/22)
+            z_txr_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
+            if next_state_reshape[0][0] == 1 and \
+                    next_state_reshape[0][1] == 1 and \
+                    next_state_reshape[0][2] == 1 and \
+                    next_state_reshape[0][3] == 3:
+                z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
         # 3D plot
         '''if i_episode == (num_episodes - 1):
             scatters_tail.append(np.array(next_state_reshape[0]))
@@ -385,15 +377,13 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
-    # 학습후 state에 대한 th연결횟수/state 방문횟수
-    if (NUM_EPISODES / 2) < i_episode:
-        z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += to_optimal
-    for i in range(16):
-        for j in range(5):
-            for k in range(5):
-                if z_txr_visit[i][j][k] != 0:
-                        z_txr_optimal[i][j][k] /= z_txr_visit[i][j][k]
-                        z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]
+# 학습후 state에 대한 th연결횟수/state 방문횟수
+for i in range(16):
+    for j in range(5):
+        for k in range(5):
+            if z_txr_visit[i][j][k] != 0:
+                    z_txr_optimal[i][j][k] /= z_txr_visit[i][j][k]
+                    z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]
 
     # z축기준 평면위치에 따른 throughput count 평균
     '''if (NUM_EPISODES / 2 < i_episode):
@@ -426,22 +416,22 @@ for i in range(4):
     df_count = pd.DataFrame(data=z_throughput_count[i])
     plt.figure()
     ax = sns.heatmap(df_count, cmap='coolwarm', annot=True)
-    plt.title('z throughput count = {0}'.format(i+1))
+    plt.title('z throughput count = {0}'.format(i+1))'''
 for i in range(4):
     dis = pd.DataFrame(data=distribution[i])
     plt.figure()
-    ax = sns.heatmap(dis, annot=True, vmin=0, vmax=0.2)
-    plt.title('dis = {0}'.format(i))'''
+    ax = sns.heatmap(dis, annot=True)
+    plt.title('dis = {0}'.format(i))
 for i in range(16):
-    opt = pd.DataFrame(data=z_txr_optimal[i])
-    visit = pd.DataFrame(data=z_txr_visit[i])
+    # opt = pd.DataFrame(data=z_txr_optimal[i])
+    # visit = pd.DataFrame(data=z_txr_visit[i])
     reward = pd.DataFrame(data=z_txr_reward[i])
-    plt.figure()
-    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True, vmin=-3, vmax=2)
+    '''plt.figure()
+    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
     plt.title('optimal : z = {0}, txr = {1}'.format(i//4+1, i%4))
     plt.figure()
     ax = sns.heatmap(visit, cmap='YlGnBu', annot=True)
-    plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))
+    plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))'''
     plt.figure()
     ax = sns.heatmap(reward, cmap='YlGnBu', annot=True)
     plt.title('reward : z = {0}, txr = {1}'.format(i//4+1, i%4))
@@ -551,13 +541,6 @@ plt.scatter(x_values, y_values, s=40)"""
 
 
 '''plt.figure()
-plt.title('reward')
-plt.xlabel('step')
-plt.ylabel('Reward')
-plt.plot(rewards)'''
-
-
-'''plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
@@ -623,10 +606,7 @@ ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.tr
 
 ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 plt.show()'''
-# env.render()
-env.close()
-plt.ioff()
-plt.show()
+
 print('seed  ', seed)
 print('BUFFER  ', BUFFER)
 print('HE  ', HE)
@@ -643,3 +623,6 @@ print('TARGET_UPDATE  ', TARGET_UPDATE)
 print('DISCOUNT_FACTOR  ', DISCOUNT_FACTOR)
 print('LEARNING_RATE  ', LEARNING_RATE)
 
+env.close()
+plt.ioff()
+plt.show()

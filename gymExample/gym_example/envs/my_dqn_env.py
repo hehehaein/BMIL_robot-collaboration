@@ -118,7 +118,8 @@ class reward_set:
         return energy_txr
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
-        u = 5  # constant that guarantees the reward to be non-negative
+        u = 8  # constant that guarantees the reward to be non-negative
+        foot_coeffi = 1/2
         reward = u + (throughput) + (foot_of_perpendicular) + (dispersed) - (energy_move/22) - (energy_txr/2)
         return reward
 
