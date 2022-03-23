@@ -416,12 +416,12 @@ for i in range(4):
     df_count = pd.DataFrame(data=z_throughput_count[i])
     plt.figure()
     ax = sns.heatmap(df_count, cmap='coolwarm', annot=True)
-    plt.title('z throughput count = {0}'.format(i+1))'''
+    plt.title('z throughput count = {0}'.format(i+1))
 for i in range(4):
     dis = pd.DataFrame(data=distribution[i])
     plt.figure()
     ax = sns.heatmap(dis, annot=True)
-    plt.title('dis = {0}'.format(i))
+    plt.title('dis = {0}'.format(i))'''
 for i in range(16):
     # opt = pd.DataFrame(data=z_txr_optimal[i])
     # visit = pd.DataFrame(data=z_txr_visit[i])
@@ -434,7 +434,7 @@ for i in range(16):
     plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))'''
     plt.figure()
     ax = sns.heatmap(reward, cmap='YlGnBu', annot=True)
-    plt.title('reward : z = {0}, txr = {1}'.format(i//4+1, i%4))
+    plt.title('reward : z = {0}, txr = {1}'.format(i//4+1, i % 4))
 plt.show()
 
 '''
