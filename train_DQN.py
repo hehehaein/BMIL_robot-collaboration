@@ -46,8 +46,8 @@ torch.backends.cudnn.deterministic = True
 os.environ["PYTHONHASHSEED"] = str(seed)
 
 # GPU를 사용할 경우
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = "cpu"
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -101,20 +101,20 @@ STEPS = 20
 DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
-EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
+EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.9)
 TARGET_UPDATE = 40
 UPDATE_FREQ = 20
-BUFFER = 100000
-LEARNING_RATE = 1e-4
+BUFFER = 10000
+LEARNING_RATE = 1e-6
 IS_DOUBLE_Q = True
 ZERO = False
 SCHEDULER = False
 SCHEDULER_GAMMA = 0.95
 
 now = time.localtime()
-str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
+str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_1th_{12}-{13}-{14}-{15}'.format(
     NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
-    BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec)
+    BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, now.tm_hour, now.tm_min, now.tm_sec)
 path = os.path.join(os.getcwd(), 'results')
 
 n_actions = env.action_space.n
@@ -181,36 +181,26 @@ def optimize_model():
     transitions = memory.sample(BATCH_SIZE)
     # batch-array의 Transitions을 Transition의 batch-arrays로 전환
     batch = Transition(*zip(*transitions))
-
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                             batch.next_state)), device=device, dtype=torch.bool)
-    for s in batch.next_state:
-        if s is not None:
-            non_final_next_states = torch.stack(tuple(torch.Tensor(s)))
 
+    non_final_next_states= torch.cat([s for s in batch.next_state
+                                              if s is not None]).reshape(BATCH_SIZE, 1, 16)
     '''propagation의 예측값 저장'''
     state_batch = torch.stack(batch.state)
     action_batch = torch.stack(batch.action)
     reward_batch = torch.stack(batch.reward)
 
-    # Q(s_t, a) 계산 - 모델이 Q(s_t)를 계산하고, 취한 행동의 열을 선택
-    # policy_net에 따라 각 배치 상태에 대해 선택된 행동
+    # Q(s_t, a) 계산
     state_action_values = policy_net(state_batch).gather(-1, action_batch.squeeze(1))
-
-    # 모든 다음 상태를 위한 V(s_{t+1}) 계산
-    # non_final_next_states의 행동들에 대한 기대값은 "이전" target_net을 기반으로 계산됩니다.
-    # max(1)[0]으로 최고의 보상을 선택
-    # 이것은 마스크를 기반으로 병합되어 기대 상태 값을 갖거나 상태가 최종인 경우 0을 갖습니다.
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    index = torch.zeros(BATCH_SIZE, device=device)
     if IS_DOUBLE_Q:
         index = policy_net(non_final_next_states).max(-1)[1].detach()
-        next_state_values = target_net(non_final_next_states)[index]
+        next_state_values = target_net(non_final_next_states)[-1][0][index].detach()
     else:
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(-1)[0].detach()
+        next_state_values = target_net(non_final_next_states).max(-1)[0].detach()
     # 기대 Q 값 계산
     expected_state_action_values = (next_state_values * DISCOUNT_FACTOR) + reward_batch
-
     # Huber 손실 계산
     '''loss 계산'''
     criterion = nn.SmoothL1Loss()
@@ -221,8 +211,6 @@ def optimize_model():
     optimizer.zero_grad()
     '''backward propagation'''
     loss.backward()
-    for param in policy_net.parameters():
-        param.grad.data.clamp_(-1, 1)
     optimizer.step() #경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.
     '''if scheduler_check: #scheduler 실행, 값 그래프 뽑기
         scheduler.step()
@@ -279,14 +267,14 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         state_reshape = np.reshape(state, (env.N + 2, 4))
         next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
 
-        '''if next_state_reshape[0][0] == 1 and \
+        if next_state_reshape[0][0] == 1 and \
                 next_state_reshape[0][1] == 1 and \
                 next_state_reshape[0][2] == 1 and \
                 next_state_reshape[0][3] == 3:
             if np.array_equal(next_state_reshape, state_reshape):
-                stay += 1'''
+                stay += 1
 
-        if reward > 13:
+        if reward > 9:
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d reward:%.6f count:%2d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
@@ -299,6 +287,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
 
         if last_set[0] != 0:
             throughput_count += 1
+        throughputs.append(last_set[0])
 
         '''throughputs.append(last_set[0])
         foots.append(last_set[1])
@@ -308,7 +297,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
-        if (NUM_EPISODES / 2) < i_episode:
+        '''if (NUM_EPISODES / 2) < i_episode:
             z_txr_page = ((state[2].int().item() - 1) * 4 + state[3]).int().item()
             z_txr_reward[z_txr_page][state[0].int().item()][state[1].int().item()] += reward - (last_set[3]/22)
             z_txr_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
@@ -316,7 +305,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
                     next_state_reshape[0][1] == 1 and \
                     next_state_reshape[0][2] == 1 and \
                     next_state_reshape[0][3] == 3:
-                z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
+                z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += 1'''
         # 3D plot
         '''if i_episode == (num_episodes - 1):
             scatters_tail.append(np.array(next_state_reshape[0]))
@@ -333,13 +322,13 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         # 다음 상태로 이동
         state = next_state
 
-        # (정책 네트워크에서) 최적화 한단계 수행
-        if i_episode % UPDATE_FREQ == 0:
-            optimize_model()
-            if done:
-                # episode_durations.append(t + 1)
-                # plot_durations()
-                break
+    # (정책 네트워크에서) 최적화 한단계 수행
+    if i_episode % UPDATE_FREQ == 0 and i_episode != NUM_EPISODES-1:
+        optimize_model()
+        if done:
+            # episode_durations.append(t + 1)
+            # plot_durations()
+             break
 
     f1 = open(path + '/' + str, 'w')
 
@@ -377,25 +366,25 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
+    # z축기준 평면위치에 따른 throughput count 평균
+    '''if (NUM_EPISODES / 2 < i_episode):
+        z_throughput[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += throughput_count
+        z_throughput_count[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += 1
+print(z_throughput_count)
+for i in range(4):
+    for j in range(5):
+        for k in range(5):
+            if z_throughput_count[i][j][k] != 0:
+                z_throughput[i][j][k] /= z_throughput_count[i][j][k]
 # 학습후 state에 대한 th연결횟수/state 방문횟수
 for i in range(16):
     for j in range(5):
         for k in range(5):
             if z_txr_visit[i][j][k] != 0:
                     z_txr_optimal[i][j][k] /= z_txr_visit[i][j][k]
-                    z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]
+                    z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]'''
+                    
 
-    # z축기준 평면위치에 따른 throughput count 평균
-    '''if (NUM_EPISODES / 2 < i_episode):
-        z_throughput[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += throughput_count
-        z_throughput_count[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += 1
-
-print(z_throughput_count)
-for i in range(4):
-    for j in range(5):
-        for k in range(5):
-            if z_throughput_count[i][j][k] != 0:
-                z_throughput[i][j][k] /= z_throughput_count[i][j][k]'''
 
 torch.save({
     'target_net': target_net.state_dict(),
@@ -421,23 +410,23 @@ for i in range(4):
     dis = pd.DataFrame(data=distribution[i])
     plt.figure()
     ax = sns.heatmap(dis, annot=True)
-    plt.title('dis = {0}'.format(i))'''
+    plt.title('dis = {0}'.format(i))
 for i in range(16):
     # opt = pd.DataFrame(data=z_txr_optimal[i])
     # visit = pd.DataFrame(data=z_txr_visit[i])
     reward = pd.DataFrame(data=z_txr_reward[i])
-    '''plt.figure()
-    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
-    plt.title('optimal : z = {0}, txr = {1}'.format(i//4+1, i%4))
-    plt.figure()
-    ax = sns.heatmap(visit, cmap='YlGnBu', annot=True)
-    plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))'''
+    #plt.figure()
+    #ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
+    #plt.title('optimal : z = {0}, txr = {1}'.format(i//4+1, i%4))
+    #plt.figure()
+    #ax = sns.heatmap(visit, cmap='YlGnBu', annot=True)
+    #plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))
     plt.figure()
     ax = sns.heatmap(reward, cmap='YlGnBu', annot=True)
     plt.title('reward : z = {0}, txr = {1}'.format(i//4+1, i % 4))
-plt.show()
+plt.show()'''
 
-'''
+
 def get_mean(array, k):
     means = []
     m = k
@@ -465,28 +454,29 @@ def make_list(episode, term):
 
 plt.figure()
 d = {'episode': range(NUM_EPISODES),
-     '1000 episode': make_list(NUM_EPISODES, 1000),
+     'episode': make_list(NUM_EPISODES, STEPS),
      'throughput count': throughput_counts}
 df = pd.DataFrame(data=d)
-th_count = sns.lineplot(data=df, x='1000 episode', y='throughput count',ci='sd')
+th_count = sns.lineplot(data=df, x='episode', y='throughput count',ci='sd')
 th_count.set(title='throughput count (0~20)')
 
 plt.figure()
 throughput_means2 = get_mean(throughputs, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     '1000 episode': make_list(NUM_EPISODES, 1000),
+     'episode': make_list(NUM_EPISODES, 1),
      'throughput': throughput_means2}
+print(len(range(NUM_EPISODES)), len(make_list(NUM_EPISODES, STEPS)), len(throughputs))
 df = pd.DataFrame(data=d)
-th = sns.lineplot(data=df, x='1000 episode', y='throughput',ci='sd')
+th = sns.lineplot(data=df, x='episode', y='throughput',ci='sd')
 th.set(title='throughput(0/6.333)')
 
 plt.figure()
 reward_means2 = get_mean(rewards, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     '1000 episode': make_list(NUM_EPISODES, 1000),
+     'episode': make_list(NUM_EPISODES, 1),
      'reward': reward_means2}
 df = pd.DataFrame(data=d)
-reward = sns.lineplot(data=df, x='1000 episode', y='reward',ci='sd')
+reward = sns.lineplot(data=df, x='episode', y='reward',ci='sd')
 reward.set(title='reward')
 
 plt.figure()
@@ -495,12 +485,12 @@ plt.xlabel('episode')
 plt.ylabel('count')
 plt.plot(stay_count)
 
-throughput_count_means1000 = get_mean(throughput_counts, 1000)
+'''throughput_count_means1000 = get_mean(throughput_counts, 1000)
 plt.figure()
 plt.title('throughput count')
 plt.xlabel('1000 episode')
 plt.ylabel('throughput count mean(0~20)')
-plt.plot(throughput_count)
+plt.plot(throughput_count_means1000)
 
 reward_means = get_mean(rewards, STEPS)
 
@@ -509,7 +499,7 @@ plt.figure()
 plt.title('reward mean 1000')
 plt.xlabel('1000 episodes')
 plt.ylabel('Reward')
-plt.plot(reward_means1000)
+plt.plot(reward_means1000)'''
 
 plt.figure()
 plt.title('eps')
@@ -521,7 +511,7 @@ plt.figure()
 plt.title('loss')
 plt.xlabel('step')
 plt.ylabel('loss')
-plt.plot(losses)'''
+plt.plot(losses)
 
 '''throughput_means1000 = get_mean(throughputs, 1000)
 plt.figure()
@@ -609,12 +599,9 @@ plt.show()'''
 
 print('seed  ', seed)
 print('BUFFER  ', BUFFER)
-print('HE  ', HE)
-print('ACTIV  ', ACTIV)
 print('ZERO  ', ZERO)
 print('IS_DOUBLE  ', IS_DOUBLE_Q)
 print('SCHEDULER  ', SCHEDULER)
-print('SCH_GAMMA  ', SCHEDULER_GAMMA)
 print('STEPS  ', STEPS)
 print('EPISODES  ', NUM_EPISODES)
 print('EPS_DECAY  ',EPS_DECAY)

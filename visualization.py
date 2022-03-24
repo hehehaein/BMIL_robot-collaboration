@@ -24,26 +24,17 @@ class DQN(nn.Module):
         self.linear1 = nn.Linear(16, 32)
         self.linear2 = nn.Linear(32, 64)
         self.linear3 = nn.Linear(64, 81)
-        """# Linear 입력의 연결 숫자는 conv2d 계층의 출력과 입력 이미지의 크기에
-        # 따라 결정되기 때문에 따로 계산을 해야합니다.
-        def conv2d_size_out(size, kernel_size = 5, stride = 2):
-            return (size - (kernel_size - 1) - 1) // stride  + 1
-        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
-        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
-        linear_input_size = convw * convh * 32
-        self.head = nn.Linear(linear_input_size, outputs)"""
     # 최적화 중에 다음 행동을 결정하기 위해서 하나의 요소 또는 배치를 이용해 호촐됩니다.
     # ([[left0exp,right0exp]...]) 를 반환합니다.
     def forward(self, x):
-        # x = x.to(device)
-        # print('forward\n',x)
-        x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))
+        m = nn.LeakyReLU(0.1)
+        x = m(self.linear1(x))
+        x = m(self.linear2(x))
         return self.linear3(x)
 path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load(path+'/64000_20_0.8_1.53125e-06_20_10_1th_100000_0.0001_1_18_6_45')['optimal_net'])
+policy_net.load_state_dict(torch.load(path+'/200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4')['policy_net'])
 policy_net.eval()
 
 select_env = "dqn-v0"
@@ -54,17 +45,21 @@ n_actions = env.action_space.n
 throughputs = []
 rewards = []
 trajectory = []
-def select_action(state):
-    argmaxAction = policy_net(state).max(-1)[1].view(1, 1)
-    return argmaxAction
-# Set the environment and initial state
-state = env.reset()
-state = torch.Tensor(state)
 throughput_count = 0
 max_count = 0
 stay = 0
+
+def select_action(state):
+    argmaxAction = policy_net(state).max(-1)[1].view(1, 1)
+    return argmaxAction
+
+# Set the environment and initial state
+
 for t in range(0,20,1):
     # 행동 선택과 수행
+    state = env.reset()
+    # state = torch.Tensor(state)
+    state = torch.Tensor([2., 0., 4., 0., 2., 3., 3., 3., 0., 0., 0., 2., 4., 4., 4., 0.])
     action = select_action(state)
     next_state, reward, done, last_set = env.step(action.item())
     state_reshape = np.reshape(state, (env.N + 2, 4))

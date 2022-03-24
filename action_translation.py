@@ -7,7 +7,7 @@ def translate_action(action):
     for i in range(4):
         array[i] = array[i] - 1
     return array
-print(translate_action(40))
+print(translate_action(19))
 '''for i in range(0,81,1):
     print(i, translate_action(i))
     if i % 10 == 0 :
