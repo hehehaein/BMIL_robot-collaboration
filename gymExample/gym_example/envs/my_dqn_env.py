@@ -118,7 +118,8 @@ class reward_set:
         return energy_txr
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
-        reward = (throughput) + (foot_of_perpendicular)
+        foot_coeff = 2
+        reward = (throughput) + (foot_coeff*foot_of_perpendicular) - energy_move/9
         return reward
 
 class My_DQN(gym.Env):

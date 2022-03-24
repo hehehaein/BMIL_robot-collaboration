@@ -100,8 +100,5 @@ plt.plot(rewards)
 
 print(stay)
 
-fig = plt.figure()
-plt.figure()
-
 plt.ioff()
 plt.show()
