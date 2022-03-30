@@ -48,7 +48,7 @@ class DQN(nn.Module):
 path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load(path+'/200000_20_0.9_4.9e-07_10_1_1th_100000_0.0001_1_True_False_1th_False-11-9-40')['policy_net'])
+policy_net.load_state_dict(torch.load(path+'/200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4')['policy_net'])
 policy_net.eval()
 
 select_env = "dqn-v0"

@@ -84,14 +84,13 @@ class reward_set:
         h = math.sqrt(math.pow(constant * kx - x, 2) + math.pow(constant * ky - y, 2) + math.pow(constant * kz - z, 2))
         return h
 
-    '''# (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
+    # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
     def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i):
         foot_of_perpendicular = self.cal_h(state_array[i][0], state_array[i][1], state_array[i][2], source, destination) \
                                 - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2],
                                              source, destination) \
                                 - state_array[i][3] + next_state_array[i][3]
-        return foot_of_perpendicular'''
-
+        return foot_of_perpendicular
     def cal_foot(self, next_state_array, source, destination, i):
         foot = next_state_array[i][3] \
                - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination)
@@ -144,7 +143,6 @@ class My_DQN(gym.Env):
     dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
     agent2 = [[2,2,3,3],[2,3,2,3],[3,2,2,3]]
 
-    count_epi = 0
     def __init__(self):
         low_range = (self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0)
         high_range = (self.MAX_LOC, self.MAX_LOC, self.MAX_LOC, self.R_MAX)
@@ -154,7 +152,6 @@ class My_DQN(gym.Env):
 
         self.observation_space = gym.spaces.Box(low=Low, high=High, dtype=int)
         self.action_space = gym.spaces.Discrete(81)
-
 
     def reset(self):
         self.count = 0
@@ -169,18 +166,13 @@ class My_DQN(gym.Env):
         relay_node.append(y)
         relay_node.append(z)
         relay_node.append(r)
-
-        #10 episode마다 initial 위치를 바꿔주는데 랜덤한 위치를 뽑아줌.
-        if self.count_epi % 10 == 0:
-            index=np.random.randint(0,3)
-        assistant_node = self.agent2[index]
-
         state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):
             state_set[0][i] = copy.deepcopy(relay_node[i])  # 릴레이노드
             state_set[1][i] = copy.deepcopy(assistant_node[i])
             state_set[2][i] = copy.deepcopy(self.source[i])
             state_set[3][i] = copy.deepcopy(self.dest[i])
+
         state_set = state_set.flatten()
 
         self.state = state_set
@@ -201,6 +193,7 @@ class My_DQN(gym.Env):
         return array
 
     def step(self, action):
+
         # print('my_env action : ', action)
         assert self.action_space.contains(action)
         self.count += 1
