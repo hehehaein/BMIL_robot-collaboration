@@ -40,6 +40,8 @@ class reward_set:
     # 인접그래프 그리기.
     # S-D까지의 경로가 있나 확인 -> 홉의 개수(has_path최단거리)찾기 -> throughput 구하기
     def cal_throughput(self, adj_array):
+
+        #연결 순서에 맞게 행렬의 위치를 변경
         tmp_array = np.zeros((self.N + 2, 4))
         tmp2_array = np.zeros((self.N + 2, 4))
         tmp_array[0] = adj_array[2]
@@ -52,6 +54,7 @@ class reward_set:
         tmp2_array[2] = tmp_array[1]
         tmp2_array[3] = tmp_array[3]
         tmp2_array = np.transpose(tmp2_array)
+
         graph = nx.Graph()
         for i in range(0, self.N + 2, 1):
             graph.add_node(i)
@@ -64,8 +67,7 @@ class reward_set:
             path_hop = self.N + 1
         else:
             path_hop = np.inf
-        #print('tmp_array\n', tmp2_array)
-        # print("path_hop : ",path_hop)
+
         if path_hop != np.inf:
             throughput = 20 / path_hop
         else:
@@ -82,13 +84,14 @@ class reward_set:
         h = math.sqrt(math.pow(constant * kx - x, 2) + math.pow(constant * ky - y, 2) + math.pow(constant * kz - z, 2))
         return h
 
-    # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
+    '''# (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
     def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i):
         foot_of_perpendicular = self.cal_h(state_array[i][0], state_array[i][1], state_array[i][2], source, destination) \
                                 - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2],
                                              source, destination) \
                                 - state_array[i][3] + next_state_array[i][3]
-        return foot_of_perpendicular
+        return foot_of_perpendicular'''
+
     def cal_foot(self, next_state_array, source, destination, i):
         foot = next_state_array[i][3] \
                - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination)
@@ -118,7 +121,8 @@ class reward_set:
         return energy_txr
 
     def cal_reward(self, throughput, foot_of_perpendicular, dispersed, energy_move, energy_txr):
-        reward = (throughput) + (foot_of_perpendicular)
+        foot_coeffi = 2
+        reward = (throughput) + (foot_coeffi * foot_of_perpendicular) - (energy_txr/9)
         return reward
 
 class My_DQN(gym.Env):
@@ -136,10 +140,11 @@ class My_DQN(gym.Env):
     MIN_HEIGHT = 1
     MAX_HEIGHT = 4
 
-    source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, 2))
+    source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, math.sqrt(2)))
     dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
-    agent2 = np.array((2,3,3,3))
+    agent2 = [[2,2,3,3],[2,3,2,3],[3,2,2,3]]
 
+    count_epi = 0
     def __init__(self):
         low_range = (self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0)
         high_range = (self.MAX_LOC, self.MAX_LOC, self.MAX_LOC, self.R_MAX)
@@ -150,23 +155,11 @@ class My_DQN(gym.Env):
         self.observation_space = gym.spaces.Box(low=Low, high=High, dtype=int)
         self.action_space = gym.spaces.Discrete(81)
 
+
     def reset(self):
         self.count = 0
-        '''if 21600 < epi:
-            x = random.randint(self.MIN_LOC, self.MAX_LOC)
-            y = random.randint(self.MIN_LOC, self.MAX_LOC)
-            z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT)
-            r = random.randint(0, self.R_MAX)
-        elif 5700 < epi:
-            x = random.randint(self.MIN_LOC, self.MAX_LOC-1)
-            y = random.randint(self.MIN_LOC, self.MAX_LOC-1)
-            z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT-1)
-            r = random.randint(0, self.R_MAX)
-        else :
-            x = random.randint(self.MIN_LOC, self.MAX_LOC-2)
-            y = random.randint(self.MIN_LOC, self.MAX_LOC-2)
-            z = random.randint(self.MIN_HEIGHT, self.MAX_HEIGHT-2)
-            r = random.randint(0, self.R_MAX)'''
+
+        #relay 노드의 initial 위치 랜덤하게 뽑아줌
         relay_node = []
         x = np.random.randint(self.MIN_LOC, self.MAX_LOC+1)
         y = np.random.randint(self.MIN_LOC, self.MAX_LOC+1)
@@ -176,14 +169,18 @@ class My_DQN(gym.Env):
         relay_node.append(y)
         relay_node.append(z)
         relay_node.append(r)
+
+        #10 episode마다 initial 위치를 바꿔주는데 랜덤한 위치를 뽑아줌.
+        if self.count_epi % 10 == 0:
+            index=np.random.randint(0,3)
+        assistant_node = self.agent2[index]
+
         state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):
             state_set[0][i] = copy.deepcopy(relay_node[i])  # 릴레이노드
-            state_set[1][i] = copy.deepcopy(self.agent2[i])
+            state_set[1][i] = copy.deepcopy(assistant_node[i])
             state_set[2][i] = copy.deepcopy(self.source[i])
             state_set[3][i] = copy.deepcopy(self.dest[i])
-        #state_set[0][2] = self.MIN_HEIGHT
-        #state_set[0][3] = 2
         state_set = state_set.flatten()
 
         self.state = state_set
@@ -204,7 +201,6 @@ class My_DQN(gym.Env):
         return array
 
     def step(self, action):
-
         # print('my_env action : ', action)
         assert self.action_space.contains(action)
         self.count += 1

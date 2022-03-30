@@ -96,16 +96,16 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 128000
+NUM_EPISODES = 200000
 STEPS = 20
-DISCOUNT_FACTOR = 0.8
+DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.01
-EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.9)
-TARGET_UPDATE = 40
-UPDATE_FREQ = 20
-BUFFER = 10000
-LEARNING_RATE = 1e-6
+EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
+TARGET_UPDATE = 10
+UPDATE_FREQ = 1
+BUFFER = 100000
+LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = True
 ZERO = False
 SCHEDULER = False
@@ -121,7 +121,6 @@ n_actions = env.action_space.n
 
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-optimal_net = DQN().to(device)
 tmp_net = DQN().to(device)
 
 target_net.eval()
@@ -178,22 +177,38 @@ scheduler_check = False'''
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
-    transitions = memory.sample(BATCH_SIZE)
-    # batch-array의 Transitions을 Transition의 batch-arrays로 전환
-    batch = Transition(*zip(*transitions))
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                            batch.next_state)), device=device, dtype=torch.bool)
 
+    #initialize
+    next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    index = torch.zeros(BATCH_SIZE, device=device
+                        )
+
+
+    # batch-array의 Transitions을 Transition의 batch-arrays로 전환
+    # Changing Format
+    # From [[S1, A1, R1, S'1], [S2, A2, R2, S'2], ..., [Sn, An, Rn, S'n]]
+    # To [S1, S2, ..., Sn], [A1, A2, ..., An], ..., [S'1, S'2, ...,S'n]
+    transitions = memory.sample(BATCH_SIZE)
+    batch = Transition(*zip(*transitions))
+
+    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,batch.next_state)), device=device, dtype=torch.bool)
+
+    #next state
+    for s in batch.next_state:
+        if s is not None:
+            non_final_next_states = torch.stack(tuple(torch.Tensor(s)))
     non_final_next_states= torch.cat([s for s in batch.next_state
                                               if s is not None]).reshape(BATCH_SIZE, 1, 16)
-    '''propagation의 예측값 저장'''
+    #state, action, reward
     state_batch = torch.stack(batch.state)
     action_batch = torch.stack(batch.action)
     reward_batch = torch.stack(batch.reward)
 
     # Q(s_t, a) 계산
-    state_action_values = policy_net(state_batch).gather(-1, action_batch.squeeze(1))
-    next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    #state_action_values = policy_net(state_batch).gather(-1, action_batch.squeeze(1))
+    state_action_values = policy_net(state_batch).reshape(BATCH_SIZE, 81, 1).gather(1, action_batch)
+
+    #print(state_action_values.size())
     if IS_DOUBLE_Q:
         index = policy_net(non_final_next_states).max(-1)[1].detach()
         next_state_values = target_net(non_final_next_states)[-1][0][index].detach()
@@ -201,18 +216,20 @@ def optimize_model():
         next_state_values = target_net(non_final_next_states).max(-1)[0].detach()
     # 기대 Q 값 계산
     expected_state_action_values = (next_state_values * DISCOUNT_FACTOR) + reward_batch
+    #print('e',expected_state_action_values.unsqueeze(1).size())
     # Huber 손실 계산
     '''loss 계산'''
     criterion = nn.SmoothL1Loss()
+    #    loss = criterion(state_action_values, expected_state_action_values)
     loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-    losses.append(loss.item())
 
     # 모델 최적화
     optimizer.zero_grad()
     '''backward propagation'''
     loss.backward()
     optimizer.step() #경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.
-    '''if scheduler_check: #scheduler 실행, 값 그래프 뽑기
+    losses.append(loss.item())
+'''if scheduler_check: #scheduler 실행, 값 그래프 뽑기
         scheduler.step()
         scheduler_lrs.append(scheduler.get_lr())
     else:
@@ -267,12 +284,12 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         state_reshape = np.reshape(state, (env.N + 2, 4))
         next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
 
-        if next_state_reshape[0][0] == 1 and \
+        '''if next_state_reshape[0][0] == 1 and \
                 next_state_reshape[0][1] == 1 and \
                 next_state_reshape[0][2] == 1 and \
                 next_state_reshape[0][3] == 3:
             if np.array_equal(next_state_reshape, state_reshape):
-                stay += 1
+                stay += 1'''
 
         if reward > 9:
             print(state_reshape[0], next_state_reshape[0],
@@ -281,9 +298,9 @@ for i_episode in tqdm(range(NUM_EPISODES)):
 
         if i_episode >= (NUM_EPISODES - 2):
             print(state_reshape[0], next_state_reshape[0],
-                  "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f dispersed:%6.3f move:%6.3f txr:%3d"
+                  "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f txr:%3d"#dispersed:%6.3f move:%6.3f
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
-                     last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
+                     last_set[0], last_set[1], last_set[4]))#last_set[2], last_set[3],
 
         if last_set[0] != 0:
             throughput_count += 1
@@ -361,8 +378,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
-    if stay == 15:
-        optimal_net.load_state_dict(policy_net.state_dict())
+
     stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
@@ -389,7 +405,6 @@ for i in range(16):
 torch.save({
     'target_net': target_net.state_dict(),
     'policy_net': policy_net.state_dict(),
-    'optimal_net': optimal_net.state_dict(),
     'optimizer': optimizer.state_dict()
 }, path + '/' + str)
 
@@ -479,13 +494,13 @@ df = pd.DataFrame(data=d)
 reward = sns.lineplot(data=df, x='episode', y='reward',ci='sd')
 reward.set(title='reward')
 
-plt.figure()
+'''plt.figure()
 plt.title('stay count(0~20)')
 plt.xlabel('episode')
 plt.ylabel('count')
 plt.plot(stay_count)
 
-'''throughput_count_means1000 = get_mean(throughput_counts, 1000)
+throughput_count_means1000 = get_mean(throughput_counts, 1000)
 plt.figure()
 plt.title('throughput count')
 plt.xlabel('1000 episode')
