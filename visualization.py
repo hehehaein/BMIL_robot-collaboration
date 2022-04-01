@@ -48,7 +48,7 @@ class DQN(nn.Module):
 path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load(path+'/200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4')['policy_net'])
+policy_net.load_state_dict(torch.load(path+'/600000_20_0.9_1.0208333333333333e-07_10_1_1th_300000_0.0001_1_True_False_1th_False-16-37-36')['policy_net'])
 policy_net.eval()
 
 select_env = "dqn-v0"
@@ -70,7 +70,7 @@ scatter2 = []
 scatter3 = []
 scatter4 = []
 
-iter_num = 1000
+iter_num = 10
 throughputs = np.zeros((iter_num,10))
 rewards = np.zeros((iter_num,10))
 for i in range(iter_num):
@@ -119,7 +119,7 @@ for i in range(iter_num):
         elif i == 4:
             scatter4.append(np.array(state_reshape[0]))'''
 
-    print(stay)
+    print(throughput_count)
     '''fig, ax1 = plt.subplots()
         color_1 = 'tab:blue'
         ax1.set_title('reward', fontsize=16)
@@ -183,7 +183,7 @@ axe2.set_ylabel('reward',fontsize=14)
 
 
 # 3D 그래프 그리기
-'''fig = plt.figure()
+fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 plt.title('position')
 ax.set_xlabel('X')
@@ -208,7 +208,7 @@ ax.scatter(np.transpose(scatter3)[0], np.transpose(scatter2)[1], np.transpose(sc
            s=60, c='purple')
 ax.scatter(np.transpose(scatter4)[0], np.transpose(scatter2)[1], np.transpose(scatter2)[2], marker='o',
            s=60, c='blue')
-ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')'''
+ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 
 plt.ioff()
 plt.show()

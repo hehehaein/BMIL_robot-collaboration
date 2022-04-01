@@ -96,15 +96,15 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 200000
+NUM_EPISODES = 600000
 STEPS = 20
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.01
-EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
+EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.8)
 TARGET_UPDATE = 10
 UPDATE_FREQ = 1
-BUFFER = 100000
+BUFFER = 300000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = True
 ZERO = False
@@ -274,7 +274,6 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         scheduler_check = True
     for t in range(0, STEPS, 1):
         move_count += 1
-        throughput_value = 0
 
         # 행동 선택과 수행
         action = select_action(state)
@@ -291,7 +290,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
             if np.array_equal(next_state_reshape, state_reshape):
                 stay += 1'''
 
-        if reward > 9:
+        if last_set[0] != 0:
             print(state_reshape[0], next_state_reshape[0],
                   "action:%2d%2d%2d%2d reward:%.6f count:%2d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
@@ -379,7 +378,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
-    stay_count.append(stay)
+    #stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
     # z축기준 평면위치에 따른 throughput count 평균
@@ -469,29 +468,29 @@ def make_list(episode, term):
 
 plt.figure()
 d = {'episode': range(NUM_EPISODES),
-     'episode': make_list(NUM_EPISODES, STEPS),
+     '1 episode': make_list(NUM_EPISODES, 1),
      'throughput count': throughput_counts}
 df = pd.DataFrame(data=d)
-th_count = sns.lineplot(data=df, x='episode', y='throughput count',ci='sd')
+th_count = sns.lineplot(data=df, x='1 episode', y='throughput count',ci='sd')
 th_count.set(title='throughput count (0~20)')
 
 plt.figure()
 throughput_means2 = get_mean(throughputs, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     'episode': make_list(NUM_EPISODES, 1),
+     '1 episode': make_list(NUM_EPISODES, 1),
      'throughput': throughput_means2}
 print(len(range(NUM_EPISODES)), len(make_list(NUM_EPISODES, STEPS)), len(throughputs))
 df = pd.DataFrame(data=d)
-th = sns.lineplot(data=df, x='episode', y='throughput',ci='sd')
+th = sns.lineplot(data=df, x='1 episode', y='throughput',ci='sd')
 th.set(title='throughput(0/6.333)')
 
 plt.figure()
 reward_means2 = get_mean(rewards, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     'episode': make_list(NUM_EPISODES, 1),
+     '1 episode': make_list(NUM_EPISODES, 1),
      'reward': reward_means2}
 df = pd.DataFrame(data=d)
-reward = sns.lineplot(data=df, x='episode', y='reward',ci='sd')
+reward = sns.lineplot(data=df, x='1 episode', y='reward',ci='sd')
 reward.set(title='reward')
 
 '''plt.figure()
@@ -624,6 +623,9 @@ print('UPDATE_FREQ  ', UPDATE_FREQ)
 print('TARGET_UPDATE  ', TARGET_UPDATE)
 print('DISCOUNT_FACTOR  ', DISCOUNT_FACTOR)
 print('LEARNING_RATE  ', LEARNING_RATE)
+print('source txr = 1, MIN_HEIGHT = 0')
+
+
 
 env.close()
 plt.ioff()
