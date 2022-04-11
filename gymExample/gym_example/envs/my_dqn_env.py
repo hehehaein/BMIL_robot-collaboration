@@ -139,18 +139,18 @@ class My_DQN(gym.Env):
     MIN_HEIGHT = 0
     MAX_HEIGHT = 4
 
-    source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, 1))
-    dest = np.array((MAX_LOC, MAX_LOC, 3, 0))
+    source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, 2))
+    dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
     #agent2 = [[2,2,3,3],[2,3,2,3],[3,2,2,3]]
-    agent2 = [[2,1,3,4],[1,2,3,4],[2,3,1,4],[1,3,2,4],[3,1,2,4],[3,2,1,4]]
-    #agent2 = np.array((2,3,3,3))
+    #agent2 = [[2,1,3,4],[1,2,3,4],[2,3,1,4],[1,3,2,4],[3,1,2,4],[3,2,1,4]]
+    agent2 = np.array((2,3,3,3))
     def __init__(self):
         low_range = (self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0)
         high_range = (self.MAX_LOC, self.MAX_LOC, self.MAX_LOC, self.R_MAX)
 
         Low = np.array(low_range * (self.N + 2))
         High = np.array(high_range * (self.N + 2))
-        High[7] =4
+        #High[7] =4
 
         self.observation_space = gym.spaces.Box(low=Low, high=High, dtype=int)
         self.action_space = gym.spaces.Discrete(81)
@@ -169,8 +169,9 @@ class My_DQN(gym.Env):
         relay_node.append(z)
         relay_node.append(r)
 
-        index = np.random.randint(0,6)
-        assistant_node = self.agent2[index]
+        # index = np.random.randint(0,6)
+        # assistant_node = self.agent2[index]
+        assistant_node = self.agent2
 
         state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):

@@ -1,325 +1,680 @@
-from itertools import product
-
+# -*- coding: utf-8 -*-
 import gym
-import numpy as np
-from gym.utils import seeding
 import random
-import math
-import networkx as nx
-from matplotlib import pyplot as plt
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
+import time
+import os
+import seaborn as sns;
+
+sns.set()
+import json
+import pickle
+from collections import namedtuple, deque, OrderedDict
+from ray.tune.registry import register_env
+
+from gymExample.gym_example.envs.my_dqn_env import My_DQN
+from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning import Trainer
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+from tqdm import tqdm
+
+select_env = "dqn-v0"
+register_env(select_env, lambda config: My_DQN())
+env = gym.make(select_env).unwrapped
+
+# matplotlib 설정
+is_ipython = 'inline' in matplotlib.get_backend()
+if is_ipython:
+    from IPython import display
+
+plt.ion()
+
+seed = 1
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.backends.cudnn.deterministic = True
+os.environ["PYTHONHASHSEED"] = str(seed)
+
+# GPU를 사용할 경우
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = "cpu"
+
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
 
 
-class reward_set:
-    def __init__(self, N):
-        self.N = N
+class ReplayMemory(object):
 
-    #S-D까지 연결되는지 확인하기위해서 인접행렬 만들기
-    def cal_adjacency(self, next_state_array):
-        adj_array = np.empty((self.N + 2, self.N + 2), float)
-        for i in range(0, self.N + 2, 1):
-            for j in range(0, self.N + 2, 1):
-                distance = math.sqrt(((next_state_array[i][0] - next_state_array[j][0]) ** 2)
-                                     + ((next_state_array[i][1] - next_state_array[j][1]) ** 2)
-                                     + ((next_state_array[i][2] - next_state_array[j][2]) ** 2))
-                if distance <= next_state_array[i][3]:
-                    adj_array[i][j] = distance
-                else:
-                    adj_array[i][j] = 0
-        #print('adj\n',adj_array)
-        return adj_array
+    def __init__(self, capacity):
+        self.memory = deque([], maxlen=capacity)
 
-    # 인접그래프 그리기.
-    # S-D까지의 경로가 있나 확인 -> 홉의 개수(has_path최단거리)찾기 -> throughput 구하기
-    def cal_throughput(self, adj_array):
-        graph = nx.Graph()
-        for i in range(0, self.N + 2, 1):
-            graph.add_node(i)
-        for i in range(0, self.N + 2, 1):
-            for j in range(0, self.N + 2, 1):
-                if adj_array[i][j] > 0:
-                    graph.add_edge(i, j)
+    def push(self, *args):
+        """transition 저장"""
+        self.memory.append(Transition(*args))
 
-        if nx.has_path(graph, self.N, self.N+1) :
-            path_hop = self.N+1
-        else:
-            path_hop = np.inf
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
 
-        # print("path_hop : ",path_hop)
-        if path_hop != np.inf:
-            throughput = 20 / path_hop
-        else:
-            throughput = 0
-
-        return throughput
-
-    def cal_dispersed(self, i, my_txr, adj_array):
-        adj_nodes = 0
-        now_disperse = 0
-        for j in range(0, self.N + 2, 1):
-            if adj_array[i][j] > 0:
-                adj_nodes += 1
-                now_disperse += adj_array[i][j]
-        # print('@@ : ',my_txr[i][3])
-        if adj_nodes == 0:
-            return 0
-        else:
-            return now_disperse / (adj_nodes * my_txr)
-
-    def cal_h(self, x, y, z, source, destination):
-        kx = destination[0] - source[0]
-        ky = destination[1] - source[1]
-        kz = destination[2] - source[2]
-        constant = (((kx * x) + (ky * y) + (kz * z)) / (math.pow(kx, 2) + math.pow(ky, 2) + math.pow(kz, 2)))
-        h = math.sqrt(math.pow(constant * kx - x, 2) + math.pow(constant * ky - y, 2) + math.pow(constant * kz - z, 2))
-        # print("h",h)
-        return h
-
-    # (시간t일때의 수선의 발 - 시간t+1일때 수선의 발)길이 구하기
-    def cal_foot_of_perpendicular(self, state_array, next_state_array, source, destination, i):
-
-        foot_of_perpendicular = self.cal_h(state_array[i][0], state_array[i][1], state_array[i][2], source, destination) \
-                            - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination) \
-                            - state_array[0][3] + next_state_array[0][3]
-        return foot_of_perpendicular
-
-    def cal_used_energy_to_move(self, action):
-        energy_move = math.sqrt((math.pow(action[0], 2) + math.pow(action[1], 2) + math.pow(action[2], 2)))
-        return energy_move
-
-    def cal_used_energy_to_keep_txr(self, my_txr):
-        energy_txr = my_txr
-        return energy_txr
-
-    def cal_reward(self, throughput, dispersed, foot_of_perpendicular, energy_move, energy_txr):
-        u = 5  # constant that guarantees the reward to be non-negative
-        reward = 5 + (5*throughput) + dispersed + foot_of_perpendicular - energy_move - (energy_txr * (2 / 5))
-        return reward
+    def __len__(self):
+        return len(self.memory)
 
 
-class My_DQN2(gym.Env):
+HE = 'kaiming_uniform'
+ACTIV = 'LeakyRelu0.1'
 
-    metadata = {
-        "render.modes": ["human"]
-    }
 
-    MAX_STEPS = 50
-    # ~number of relay node
-    N = 2
-    # ~transmission radius max
-    R_MAX = 3
-    # location x,y,z
-    MIN_LOC = 0
-    MAX_LOC = 4
-
-    MAX_HEIGHT = 3
-    MIN_HEIGHT = 0
-
-    source = np.array((MIN_LOC, MIN_LOC, MIN_HEIGHT, R_MAX))
-    dest = np.array((MAX_LOC, MAX_LOC, MAX_LOC, 0))
-    agent2 = np.array((3, 3, 3, 3))
+class DQN(nn.Module):
 
     def __init__(self):
-        """low_range = (MIN_LOC, MIN_LOC, MIN_LOC, 0)
-        high_range = (MAX_LOC, MAX_LOC, MAX_LOC, R_MAX)
+        super(DQN, self).__init__()
+        self.linear1 = nn.Linear(16, 32)
+        self.linear2 = nn.Linear(32, 64)
+        self.linear3 = nn.Linear(64, 81)
+        nn.init.kaiming_normal_(self.linear1.weight, mode='fan_in', nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(self.linear2.weight, mode='fan_in', nonlinearity='leaky_relu')
+        nn.init.kaiming_normal_(self.linear3.weight, mode='fan_in', nonlinearity='leaky_relu')
 
-        Low = np.array(low_range * (N + 2))
-        High = np.array(high_range * (N + 2))
-
-        d = [-1, 0, 1]
-        all_state = []
-        for i in range(N + 2):
-            all_state.append(d)
-        self.state_space = list(product(*all_state))
-        num_state_space = len(self.state_space) #81"""
-
-        self.observation_space = gym.spaces.Box(low=np.array([self.MIN_LOC, self.MIN_LOC, self.MIN_LOC, 0]),
-                                                high=np.array([self.MAX_LOC, self.MAX_LOC, self.MAX_LOC, self.R_MAX]),
-                                                dtype=int)
-
-        #self.action_space = gym.spaces.Tuple((gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3), gym.spaces.Discrete(3)))
-        #self.action_space = gym.spaces.MultiDiscrete([3,3,3,3])
-        self.action_space = gym.spaces.Discrete(81)
-
-    def reset(self):
-        """
-        Reset the state of the environment and returns an initial observation.
-
-        Returns
-        -------
-        observation (object): the initial observation of the space.
-        """
-        self.count = 0
-
-        self.state = self.dest.copy()
-        self.state[2] = self.MAX_HEIGHT
-        self.last_set = np.zeros(9)
-        self.reward = 0
-        self.done = False
-        self.info = {}
-
-        return self.state
-
-    def translate_action(self,action):
-        array = np.zeros(4, dtype=int)
-        for i in range(4):
-            array[i] = action % 3
-            action = action/3
-        for i in range(4):
-            array[i] = array[i]
-        return array
-
-    def step(self, action):
-        """
-        The agent takes a step in the environment.
-
-        Parameters
-        ----------
-        action : Discrete
-
-        Returns
-        -------
-        observation, reward, done, info : tuple
-            observation (object) :
-                an environment-specific object representing your observation of
-                the environment.
-
-            reward (float) :
-                amount of reward achieved by the previous action. The scale
-                varies between environments, but the goal is always to increase
-                your total reward.
-
-            done (bool) :
-                whether it's time to reset the environment again. Most (but not
-                all) tasks are divided up into well-defined episodes, and done
-                being True indicates the episode has terminated. (For example,
-                perhaps the pole tipped too far, or you lost your last life.)
-
-            info (dict) :
-                 diagnostic information useful for debugging. It can sometimes
-                 be useful for learning (for example, it might contain the raw
-                 probabilities behind the environment's last state change).
-                 However, official evaluations of your agent are not allowed to
-                 use this for learning.
-        """
-
-        if self.done:
-            # code should never reach this point
-            print("EPISODE DONE!!!")
-
-        elif self.count == self.MAX_STEPS:
-            self.done = True
-
-        else:
-
-            # print('my_env action : ', action)
-            assert self.action_space.contains(action)
-            self.count += 1
-            real_action = self.translate_action(action)
-            #print(real_action)
-            self.next_state = self.state
-            # action을 모두 수행
-            for i in range(4):
-                self.next_state[i] += (real_action[i] - 1)
-
-            # x,y,z좌표 이동범위, txr 가능범위 넘었나 확인
-            for i in range(0, 2, 1):  # x,y좌표 이동범위 넘었나 확인
-                if (self.next_state[i] > self.MAX_LOC) or (self.next_state[i] < self.MIN_LOC):
-                    self.next_state[i] -= (real_action[i] - 1)
-            if (self.next_state[2] > self.MAX_HEIGHT) or (self.next_state[2] < self.MIN_HEIGHT):  # z좌표 이동범위 넘었나 확인
-                self.next_state[2] -= (real_action[2] - 1)
-            if (self.next_state[3] > self.R_MAX) or (self.next_state[3] < 0):  # txr 가능범위 넘었나 확인
-                self.next_state[3] -= (real_action[3] - 1)
-
-            state_position_array = np.zeros((self.N + 2, 4))
-            state_position_array[0] = self.state
-            state_position_array[1] = self.agent2.copy()
-            state_position_array[2] = self.source.copy()
-            state_position_array[3] = self.dest.copy()
-
-            next_position_array = np.zeros((self.N + 2, 4))
-            next_position_array[0] = self.next_state
-            next_position_array[1] = self.agent2.copy()
-            next_position_array[2] = self.source.copy()
-            next_position_array[3] = self.dest.copy()
-
-            env = reward_set(self.N)
-            adj_arr = env.cal_adjacency(next_position_array)
-            self.throughput = env.cal_throughput(adj_arr)
-            dispersed = env.cal_dispersed(0, next_position_array[0][3], adj_arr)
-            foot = env.cal_foot_of_perpendicular(state_position_array, next_position_array, self.source, self.dest, 0)
-            e_move = env.cal_used_energy_to_move(real_action)
-            e_txr = env.cal_used_energy_to_keep_txr(next_position_array[0][3])
-            # print("%6.3f %6.3f %6.3f %6.3f %3d" %(throughput, dispersed, foot, e_move, e_txr))
-            self.last_set[0] = self.throughput
-            self.last_set[1] = foot
-            self.last_set[2] = dispersed
-            self.last_set[3] = e_move
-            self.last_set[4] = e_txr
-            self.last_set[5] = real_action[0]-1
-            self.last_set[6] = real_action[1]-1
-            self.last_set[7] = real_action[2]-1
-            self.last_set[8] = real_action[3]-1
-
-            self.reward = env.cal_reward(self.throughput, dispersed, foot, e_move, e_txr)
-
-        try:
-            # assert self.observation_space.contains(self.state)
-            assert self.observation_space.contains(self.next_state)
-
-        except AssertionError:
-            print("INVALID STATE", self.next_state)
-        return [self.next_state, self.reward, self.done, self.last_set]
-
-    def render (self, state, mode="human"):
-        """Renders the environment.
-
-        The set of supported modes varies per environment. (And some
-        environments do not support rendering at all.) By convention,
-        if mode is:
-
-        - human: render to the current display or terminal and
-          return nothing. Usually for human consumption.
-        - rgb_array: Return an numpy.ndarray with shape (x, y, 3),
-          representing RGB values for an x-by-y pixel image, suitable
-          for turning into a video.
-        - ansi: Return a string (str) or StringIO.StringIO containing a
-          terminal-style text representation. The text can include newlines
-          and ANSI escape sequences (e.g. for colors).
-
-        Note:
-            Make sure that your class's metadata 'render.modes' key includes
-              the list of supported modes. It's recommended to call super()
-              in implementations to use the functionality of this method.
-
-        Args:
-            mode (str): the mode to render with
-        """
-        #s = "position: {:2d}  reward: {:2d}  info: {}"
-        #print(s.format(self.state, self.reward, self.info))
+    # 최적화 중에 다음 행동을 결정하기 위해서 하나의 요소 또는 배치를 이용해 호촐됩니다.
+    # ([[left0exp,right0exp]...]) 를 반환합니다.
+    def forward(self, x):
+        # x = x.to(device)
+        # print('forward\n',x)
+        m = nn.LeakyReLU(0.1)
+        x = m(self.linear1(x))
+        x = m(self.linear2(x))
+        '''x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))'''
+        return self.linear3(x)
 
 
-    def seed (self, seed=None):
-        """Sets the seed for this env's random number generator(s).
+BATCH_SIZE = 64
+NUM_EPISODES = 200000
+STEPS = 20
+DISCOUNT_FACTOR = 0.9
+EPS_START = 0.99
+EPS_END = 0.01
+EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
+TARGET_UPDATE = 10
+UPDATE_FREQ = 1
+BUFFER = 100000
+LEARNING_RATE = 1e-4
+IS_DOUBLE_Q = True
+ZERO = False
+SCHEDULER = False
+SCHEDULER_GAMMA = 0.95
 
-        Note:
-            Some environments use multiple pseudorandom number generators.
-            We want to capture all such seeds used in order to ensure that
-            there aren't accidental correlations between multiple generators.
+now = time.localtime()
+str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_1th_{12}-{13}-{14}-{15}'.format(
+    NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
+    BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, now.tm_hour, now.tm_min, now.tm_sec)
+path = os.path.join(os.getcwd(), 'results')
 
-        Returns:
-            list<bigint>: Returns the list of seeds used in this env's random
-              number generators. The first value in the list should be the
-              "main" seed, or the value which a reproducer should pass to
-              'seed'. Often, the main seed equals the provided 'seed', but
-              this won't be true if seed=None, for example.
-        """
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
+n_actions = env.action_space.n
+
+policy_net = DQN().to(device)
+target_net = DQN().to(device)
+tmp_net = DQN().to(device)
+
+target_net.eval()
+optimizer = optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
+memory = ReplayMemory(BUFFER)
+'''if SCHEDULER:
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=SCHEDULER_GAMMA)'''
+'''earlystop = EarlyStopping(monitor='val_loss', patience=5, verbose=True, mode='min')
+trainer = Trainer(callbacks=[earlystop])'''
+
+epslions = []
+steps_done = 0
 
 
-    def close (self):
-        """Override close in your subclass to perform any necessary cleanup.
-        Environments will automatically close() themselves when
-        garbage collected or when the program exits.
-        """
-        pass
+def select_action(state):
+    global steps_done
+    # 멈춰있는 action 확률 키우기
+    a1 = []  # 빈 리스트 생성
+    a2 = []
+    a3 = []
+    for i in range(n_actions):
+        a1.append(1)
+        a2.append(3 / 356)
+        a3.append(0.0044)
+    a2[40] = 1 / 16
+    a3[40] = 81 / 125
+
+    sample = random.random()
+    eps_threshold = max(EPS_END, EPS_START - (EPS_DECAY * steps_done))
+    epslions.append(eps_threshold)
+    steps_done += 1
+
+    # eps greedy method
+    if sample > eps_threshold:
+        with torch.no_grad():
+            # t.max (1)은 각 행의 가장 큰 열 값을 반환합니다.
+            # 최대 결과의 두번째 열은 최대 요소의 주소값이므로,
+            # 기대 보상이 더 큰 행동을 선택할 수 있습니다.
+            return policy_net(state).max(-1)[1].view(1, 1)
+    else:
+
+        if ZERO:  # action이 0일 확률을 키우는 경우
+            if (20 * STEPS * NUM_EPISODES) * 0.5 * 0.66 < steps_done:
+                return torch.tensor([random.choices(range(0, n_actions), weights=a3)], device=device, dtype=torch.long)
+            elif (20 * STEPS * NUM_EPISODES) * 0.5 * 0.33 < steps_done:
+                return torch.tensor([random.choices(range(0, n_actions), weights=a2)], device=device, dtype=torch.long)
+            else:
+                return torch.tensor([random.choices(range(0, n_actions), weights=a1)], device=device, dtype=torch.long)
+        else:  # 모두 같은 확률일 경우
+            return torch.tensor([[random.randrange(n_actions)]], device=device, dtype=torch.long)
+
+
+losses = []
+'''scheduler_lrs = []
+scheduler_check = False'''
+
+
+# 최적화의 한 단계를 수행함
+def optimize_model():
+    if len(memory) < BATCH_SIZE:
+        return
+
+    # initialize
+    next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    index = torch.zeros(BATCH_SIZE, device=device
+                        )
+
+    # batch-array의 Transitions을 Transition의 batch-arrays로 전환
+    # Changing Format
+    # From [[S1, A1, R1, S'1], [S2, A2, R2, S'2], ..., [Sn, An, Rn, S'n]]
+    # To [S1, S2, ..., Sn], [A1, A2, ..., An], ..., [S'1, S'2, ...,S'n]
+    transitions = memory.sample(BATCH_SIZE)
+    batch = Transition(*zip(*transitions))
+
+    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=device,
+                                  dtype=torch.bool)
+
+    # next state
+    for s in batch.next_state:
+        if s is not None:
+            non_final_next_states = torch.stack(tuple(torch.Tensor(s)))
+    non_final_next_states = torch.cat([s for s in batch.next_state
+                                       if s is not None]).reshape(BATCH_SIZE, 1, 16)
+    # state, action, reward
+    state_batch = torch.stack(batch.state)
+    action_batch = torch.stack(batch.action)
+    reward_batch = torch.stack(batch.reward)
+
+    # Q(s_t, a) 계산
+    # state_action_values = policy_net(state_batch).gather(-1, action_batch.squeeze(1))
+    state_action_values = policy_net(state_batch).reshape(BATCH_SIZE, 81, 1).gather(1, action_batch)
+
+    # print(state_action_values.size())
+    if IS_DOUBLE_Q:
+        index = policy_net(non_final_next_states).max(-1)[1].detach()
+        next_state_values = target_net(non_final_next_states)[-1][0][index].detach()
+    else:
+        next_state_values = target_net(non_final_next_states).max(-1)[0].detach()
+    # 기대 Q 값 계산
+    expected_state_action_values = (next_state_values * DISCOUNT_FACTOR) + reward_batch
+    # print('e',expected_state_action_values.unsqueeze(1).size())
+    # Huber 손실 계산
+    '''loss 계산'''
+    criterion = nn.SmoothL1Loss()
+    #    loss = criterion(state_action_values, expected_state_action_values)
+    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+
+    # 모델 최적화
+    optimizer.zero_grad()
+    '''backward propagation'''
+    loss.backward()
+    optimizer.step()  # 경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.
+    losses.append(loss.item())
+
+
+'''if scheduler_check: #scheduler 실행, 값 그래프 뽑기
+        scheduler.step()
+        scheduler_lrs.append(scheduler.get_lr())
+    else:
+        scheduler_lrs.append(LEARNING_RATE)'''
+
+def get_mean(array, k):
+    means = []
+    m = k
+    if k == STEPS:
+        m = 1
+    for n in range(0, NUM_EPISODES // m, 1):
+        sum = 0
+        for i in range(0, k, 1):
+            sum += array[(n * k) + i]
+        means.append(sum / k)
+    return means
+
+
+def make_list(episode, term):
+    i = 0
+    n = 0
+    list = []
+    while i < episode:
+        for t in range(term):
+            list.append(n)
+            i += 1
+        n += 1
+    return list
+
+actions = []
+throughputs = []
+foots = []
+disperses = []
+moves = []
+txrs = []
+rewards = []
+throughput_counts = []  # 한 에피소드당 throughput 연결횟수
+stay_count = []  # 한 에피소드당 optimal 위치에 머무는 횟수
+opti_count = []  # 한 에피소드당 optimal한 위치에 가는 횟수
+'''scatters_front = []
+scatters_middle = []
+scatters_tail = []'''
+z_throughput = np.zeros((4, 5, 5))  # 한 에피소드당 throughput값를 z에 대한 시작위치에다가 1 저장
+z_throughput_count = np.zeros((4, 5, 5))  # throughput이 연결되는 z에 대한 해당위치에 몇변 가는지
+z_txr_optimal = np.zeros((16, 5, 5))  # s_(t+1)이 optimal한 위치이면 count
+z_txr_visit = np.zeros((16, 5, 5))
+z_txr_reward = np.zeros((16, 5, 5))  # reward plot
+distribution = np.zeros((4, 5, 5))  # 시작위치가 골고루 분포해서 생성되는지 확인
+reward_count = 0
+optimal = 0
+visit_reward_count = 0
+iter = 10
+for i in range(iter):
+    seed = i
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    each_rewards = []
+
+    for i_episode in tqdm(range(NUM_EPISODES)):
+        throughput_count = 0  # 한 에피소드당 throghput이 연결되는 횟수
+        # optimal = 0
+        stay = 0
+        move_count = 0  # 몇 스텝 갔는지 확인용
+        # 환경과 상태 초기화
+        state = env.reset()
+        state = torch.Tensor(state)
+
+        # distribution print
+        distribution[state[2].int().item() - 1][state[0].int().item()][state[1].int().item()] += 1
+        state_for_save = state
+
+        if SCHEDULER and i_episode == NUM_EPISODES // 2:
+            scheduler_check = True
+        for t in range(0, STEPS, 1):
+            move_count += 1
+
+            # 행동 선택과 수행
+            action = select_action(state)
+            actions.append(action.item())
+            next_state, reward, done, last_set = env.step(action.item())
+
+            state_reshape = np.reshape(state, (env.N + 2, 4))
+            next_state_reshape = np.reshape(next_state, (env.N + 2, 4))
+
+            '''if next_state_reshape[0][0] == 1 and \
+                    next_state_reshape[0][1] == 1 and \
+                    next_state_reshape[0][2] == 1 and \
+                    next_state_reshape[0][3] == 3:
+                if np.array_equal(next_state_reshape, state_reshape):
+                    stay += 1'''
+
+            if last_set[0] != 0:
+                print(i, state_reshape[0], next_state_reshape[0],
+                      "action:%2d%2d%2d%2d reward:%.6f count:%2d"
+                      % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
+
+            if i_episode >= (NUM_EPISODES - 2):
+                print(state_reshape[0], next_state_reshape[0],
+                      "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f txr:%3d"  # dispersed:%6.3f move:%6.3f
+                      % (last_set[5], last_set[6], last_set[7], last_set[8],
+                         last_set[0], last_set[1], last_set[4]))  # last_set[2], last_set[3],
+
+            if last_set[0] != 0:
+                throughput_count += 1
+            throughputs.append(last_set[0])
+
+            '''throughputs.append(last_set[0])
+            foots.append(last_set[1])
+            disperses.append(last_set[2])
+            moves.append(last_set[3])
+            txrs.append(last_set[4])'''
+            rewards.append(reward)
+            each_rewards.append(reward)
+            reward = torch.tensor([reward], device=device)
+
+            '''if (NUM_EPISODES / 2) < i_episode:
+                z_txr_page = ((state[2].int().item() - 1) * 4 + state[3]).int().item()
+                z_txr_reward[z_txr_page][state[0].int().item()][state[1].int().item()] += reward - (last_set[3]/22)
+                z_txr_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
+                if next_state_reshape[0][0] == 1 and \
+                        next_state_reshape[0][1] == 1 and \
+                        next_state_reshape[0][2] == 1 and \
+                        next_state_reshape[0][3] == 3:
+                    z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += 1'''
+            # 3D plot
+            '''if i_episode == (num_episodes - 1):
+                scatters_tail.append(np.array(next_state_reshape[0]))
+            elif i_episode == num_episodes // 2:
+                scatters_middle.append(np.array(next_state_reshape[0]))
+            elif i_episode == 0:
+                scatters_front.append(np.array(next_state_reshape[0]))'''
+
+            next_state = torch.Tensor(next_state)
+            if done:
+                next_state = None
+            # 메모리에 변이 저장
+            memory.push(state, action, next_state, reward)
+            # 다음 상태로 이동
+            state = next_state
+
+        # (정책 네트워크에서) 최적화 한단계 수행
+        if i_episode % UPDATE_FREQ == 0 and i_episode != NUM_EPISODES - 1:
+            optimize_model()
+            if done:
+                # episode_durations.append(t + 1)
+                # plot_durations()
+                break
+
+        f1 = open(path + '/' + str, 'w')
+
+        # 데이터 저장
+        '''f2 = open(path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
+            NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
+            BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec), 'w')
+    
+        if (i_episode % 100 == 0) and (100000 < i_episode):
+            tmp_net.load_state_dict(policy_net.state_dict())
+            torch.save({'epi{}'.format(i_episode): tmp_net.state_dict()}, path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}_{17}_epi'.format(
+                                                                            NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
+                                                                            BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec,i_episode))
+            data = pd.DataFrame({'ACTION': actions,
+                         'THROUGHPUT': throughputs,
+                         'FOOT': foots,
+                         'DISPERSED': disperses,
+                         'MOVE': moves,
+                         'TXR': txrs,
+                         'REWARD': rewards
+                         })
+            data.to_pickle(path+'/'+str+'epi{}'.format(i_episode)+'_data.pickle')'''
+
+        # gradient 출력
+        if i_episode == NUM_EPISODES - 1:
+            for p in policy_net.parameters():
+                with torch.no_grad():
+                    print(p.grad, len(p.grad), p.grad.shape)
+
+        # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
+        if i_episode % TARGET_UPDATE == 0:
+            target_net.load_state_dict(policy_net.state_dict())
+
+        # stay_count.append(stay)
+        throughput_counts.append(throughput_count)
+
+    plt.figure()
+    reward_means2 = get_mean(each_rewards, STEPS)
+    reward_means2_100 = []
+    reward_means2_100 = get_mean(reward_means2, 100)
+    d = {'1 episode': make_list(NUM_EPISODES, 1),
+         'reward': reward_means2}
+    df = pd.DataFrame(data=d)
+    reward = sns.lineplot(data=df, x='1 episode', y='reward', ci='sd')
+    reward.set(title='reward in {}'.format(i))
+
+    plt.figure()
+    d = {'100 episode': make_list(NUM_EPISODES // 100, 1),
+         'reward': reward_means2_100}
+    df = pd.DataFrame(data=d)
+    reward = sns.lineplot(data=df, x='100 episode', y='reward', ci='sd')
+    reward.set(title='reward in {}'.format(i))
+
+    # z축기준 평면위치에 따른 throughput count 평균
+    '''if (NUM_EPISODES / 2 < i_episode):
+            z_throughput[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += throughput_count
+            z_throughput_count[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += 1
+    print(z_throughput_count)
+    for i in range(4):
+        for j in range(5):
+            for k in range(5):
+                if z_throughput_count[i][j][k] != 0:
+                    z_throughput[i][j][k] /= z_throughput_count[i][j][k]
+    # 학습후 state에 대한 th연결횟수/state 방문횟수
+    for i in range(16):
+        for j in range(5):
+            for k in range(5):
+                if z_txr_visit[i][j][k] != 0:
+                        z_txr_optimal[i][j][k] /= z_txr_visit[i][j][k]
+                        z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]'''
+
+
+    torch.save({
+        'target_net': target_net.state_dict(),
+        'policy_net': policy_net.state_dict(),
+        'optimizer': optimizer.state_dict()
+    }, path + '/' + str)
+
+print('Complete')
+
+# heatmap by plt.pcolor()
+'''for i in range(4):
+    df = pd.DataFrame(data=z_throughput[i])
+    plt.figure()
+    ax = sns.heatmap(df, annot=True, vmin=0, vmax=0.2)
+    plt.title('z = {0}'.format(i))
+for i in range(4):
+    df_count = pd.DataFrame(data=z_throughput_count[i])
+    plt.figure()
+    ax = sns.heatmap(df_count, cmap='coolwarm', annot=True)
+    plt.title('z throughput count = {0}'.format(i+1))
+for i in range(4):
+    dis = pd.DataFrame(data=distribution[i])
+    plt.figure()
+    ax = sns.heatmap(dis, annot=True)
+    plt.title('dis = {0}'.format(i))
+for i in range(16):
+    # opt = pd.DataFrame(data=z_txr_optimal[i])
+    # visit = pd.DataFrame(data=z_txr_visit[i])
+    reward = pd.DataFrame(data=z_txr_reward[i])
+    #plt.figure()
+    #ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
+    #plt.title('optimal : z = {0}, txr = {1}'.format(i//4+1, i%4))
+    #plt.figure()
+    #ax = sns.heatmap(visit, cmap='YlGnBu', annot=True)
+    #plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))
+    plt.figure()
+    ax = sns.heatmap(reward, cmap='YlGnBu', annot=True)
+    plt.title('reward : z = {0}, txr = {1}'.format(i//4+1, i % 4))
+plt.show()'''
+
+
+
+# plt.figure()
+# d = {'episode': range(NUM_EPISODES),
+#      '1 episode': make_list(NUM_EPISODES, 1),
+#      'throughput count': throughput_counts}
+# df = pd.DataFrame(data=d)
+# th_count = sns.lineplot(data=df, x='1 episode', y='throughput count', ci='sd')
+# th_count.set(title='throughput count (0~20)')
+#
+# plt.figure()
+# throughput_means2 = get_mean(throughputs, STEPS)
+# d = {'episode': range(NUM_EPISODES),
+#      '1 episode': make_list(NUM_EPISODES, 1),
+#      'throughput': throughput_means2}
+# print(len(range(NUM_EPISODES)), len(make_list(NUM_EPISODES, STEPS)), len(throughputs))
+# df = pd.DataFrame(data=d)
+# th = sns.lineplot(data=df, x='1 episode', y='throughput', ci='sd')
+# th.set(title='throughput(0/6.333)')
+
+plt.figure()
+reward_means = np.reshape(rewards, (iter,NUM_EPISODES*STEPS))
+reward_means2 = []
+for i in range(iter):
+    tmp = get_mean(reward_means[i], STEPS)
+    reward_means2.append(tmp)
+
+reward_means2_100 = []
+for i in range(iter):
+    tmp = get_mean(reward_means2[i], 100)
+    reward_means2_100.append(tmp)
+reward_means2_100 = np.transpose(reward_means2_100)
+reward_means2_100 = reward_means2_100.flatten()
+
+reward_means2 = np.transpose(reward_means2)
+reward_means2 = reward_means2.flatten()
+
+d = {'1 episode': make_list(NUM_EPISODES*iter, iter),
+     'reward': reward_means2}
+df = pd.DataFrame(data=d)
+reward = sns.lineplot(data=df, x='1 episode', y='reward', ci='sd')
+reward.set(title='reward')
+
+plt.figure()
+d = {'100 episode': make_list(NUM_EPISODES//100*iter, iter),
+     'reward': reward_means2_100}
+df = pd.DataFrame(data=d)
+reward = sns.lineplot(data=df, x='100 episode', y='reward', ci='sd')
+reward.set(title='reward')
+
+'''plt.figure()
+plt.title('stay count(0~20)')
+plt.xlabel('episode')
+plt.ylabel('count')
+plt.plot(stay_count)
+
+throughput_count_means1000 = get_mean(throughput_counts, 1000)
+plt.figure()
+plt.title('throughput count')
+plt.xlabel('1000 episode')
+plt.ylabel('throughput count mean(0~20)')
+plt.plot(throughput_count_means1000)
+
+reward_means = get_mean(rewards, STEPS)
+
+reward_means1000 = get_mean(reward_means, 1000)
+plt.figure()
+plt.title('reward mean 1000')
+plt.xlabel('1000 episodes')
+plt.ylabel('Reward')
+plt.plot(reward_means1000)'''
+
+# plt.figure()
+# plt.title('eps')
+# plt.xlabel('step')
+# plt.ylabel('epsilon')
+# plt.plot(epslions)
+#
+# plt.figure()
+# plt.title('loss')
+# plt.xlabel('step')
+# plt.ylabel('loss')
+# plt.plot(losses)
+
+'''throughput_means1000 = get_mean(throughputs, 1000)
+plt.figure()
+plt.title('throughput value mean 1000')
+plt.xlabel('1000 episode')
+plt.ylabel('throughput value mean(0/6.333)')
+plt.plot(throughput_means1000)'''
+
+"""plt.figure()
+plt.title('throughput')
+plt.xlabel('step')
+plt.ylabel('throughput')
+x_values = list(range(throughputs.__len__()))
+y_values = [y for y in throughputs]
+plt.scatter(x_values, y_values, s=40)"""
+
+'''plt.figure()
+plt.title('reward mean')
+plt.xlabel('episode')
+plt.ylabel('Reward')
+plt.plot(reward_means)'''
+
+'''reward_means50 = get_mean(reward_means, 50)
+plt.figure()
+plt.title('reward mean 50')
+plt.xlabel('50 episodes')
+plt.ylabel('Reward')
+plt.plot(reward_means50)'''
+
+'''plt.figure()
+plt.title('scheduler')
+plt.xlabel('episode')
+plt.ylabel('lr')
+plt.plot(scheduler_lrs)'''
+
+"""def create_sphere(cx, cy, cz, r):
+    u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
+    x = np.cos(u) * np.sin(v)
+    y = np.sin(u) * np.sin(v)
+    z = np.cos(v)
+    # shift and scale sphere
+    x = r * x + cx
+    y = r * y + cy
+    z = r * z + cz
+    return (x, y, z)"""
+
+# 3D 그래프 그리기
+'''fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+plt.title('position')
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+ax.set_xlim3d(0, env.MAX_LOC)
+ax.set_ylim3d(env.MAX_LOC, 0)
+ax.set_zlim3d(0, env.MAX_LOC)
+color_list = ("olive", "orange", "green", "blue", "purple", "black", "cyan", "pink", "brown", "darkslategray")
+
+nodes = []
+nodes.append(env.source)
+nodes.append(env.dest)
+nodes.append(env.agent2)
+"""for i in range(0, env.MAX_STEPS//10, 1):
+    for j in range(10):
+        # 구 그리기
+        (x, y, z) = create_sphere(scatters[i][0], scatters[i][1], scatters[i][2], scatters[i][3])
+        ax.auto_scale_xyz([0, 500], [0, 500], [0, 0.15])
+        ax.plot_surface(x, y, z, color=color_list[i%6], linewidth=0, alpha=0.1)
+        # 점 찍기
+        ax.scatter(np.transpose(scatters)[0], np.transpose(scatters)[1], np.transpose(scatters)[2],marker='o', s=60, c=color_list[i])"""
+ax.scatter(np.transpose(scatters_front)[0], np.transpose(scatters_front)[1], np.transpose(scatters_front)[2],
+           marker='o', s=60, c='orange')
+ax.scatter(np.transpose(scatters_middle)[0], np.transpose(scatters_middle)[1], np.transpose(scatters_middle)[2],
+           marker='o', s=60, c='red')
+ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.transpose(scatters_tail)[2], marker='o',
+           s=60, c='purple')
+
+ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
+plt.show()'''
+
+print('seed  ', seed)
+print('BUFFER  ', BUFFER)
+print('ZERO  ', ZERO)
+print('IS_DOUBLE  ', IS_DOUBLE_Q)
+print('SCHEDULER  ', SCHEDULER)
+print('STEPS  ', STEPS)
+print('EPISODES  ', NUM_EPISODES)
+print('EPS_DECAY  ', EPS_DECAY)
+print('UPDATE_FREQ  ', UPDATE_FREQ)
+print('TARGET_UPDATE  ', TARGET_UPDATE)
+print('DISCOUNT_FACTOR  ', DISCOUNT_FACTOR)
+print('LEARNING_RATE  ', LEARNING_RATE)
+print('source txr = 1, MIN_HEIGHT = 0')
+
+env.close()
+plt.ioff()
+plt.show()

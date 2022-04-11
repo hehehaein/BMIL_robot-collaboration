@@ -8,6 +8,7 @@ import pandas as pd
 import time
 import os
 import seaborn as sns;
+import argparse
 
 sns.set()
 import json
@@ -38,20 +39,85 @@ if is_ipython:
 
 plt.ion()
 
-seed = 1
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
+# terminal command for convenience
+parser = argparse.ArgumentParser(description='AE-based Inverse Rational Control.Stochastic.ver')
+parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+                    help='input batch size for training (default: 64)')
+parser.add_argument('--ep', type=int, default=200000, metavar='N',
+                    help='number of episode to train (default: 32000)')
+parser.add_argument('--exp', type=float, default=0.5, metavar='N',
+                    help='exploration ratio range [0,1] (default: 0.5)')
+parser.add_argument('--seed', type=int, default=1, metavar='S',
+                    help='random seed (default: 1)')
+parser.add_argument('--lr', type=float, default=1e-04, metavar='N',
+                    help='learning rate (default= 0.0001)')
+parser.add_argument('--timestep', type=int, default=20, metavar='N',
+                    help='timesteps of an episode  (default= 20)')
+parser.add_argument('--update-freq', type=int, default=10, metavar='N',
+                    help='frequency of update for policy network (default= 20)')
+parser.add_argument('--update-freq-target', type=int, default=1, metavar='N',
+                    help='frequency of update for policy network (default= twice of update frequency )')
+parser.add_argument('--coef-foot', type=float, default=1/5, metavar='N',
+                    help='foot coefficient (default= 1/5)')
+parser.add_argument('--DDQN', type=bool, default=False, metavar='N',
+                    help='using DDQN algorithm, when True; using DQN algorithm, when False (default= False)')
+
+args = parser.parse_args()
+# args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+print()
+print(' ################       #####                #####    #####    ###')
+print(' ###           ###      ######              ######     ###     ###')
+print(' ###             ###    ###  ###          ###  ###     ###     ###')
+print(' ###           ###      ###    ###      ###    ###     ###     ###')
+print(' ###############        ###      ###  ###      ###     ###     ###')
+print(' ###           ###      ###        ###         ###     ###     ###')
+print(' ###             ###    ###                    ###     ###     ###')
+print(' ###           ###      ###                    ###     ###     ###')
+print(' ###############        ###                    ###    #####    ##################')
+print()
+
+print()
+print('DQN-based Formulating FANET')
+print()
+print('- Laboratory:')
+print('Brain and Machine Intelligence Lab')
+print('School of Electrical Engineering')
+print('Soongsil Univ.')
+print('Republic of Korea')
+print('https://brainmil.wordpress.com')
+print()
+print('- Developer:')
+print(' Haein Seo')
+print('- Professor:')
+print(' Minhae Kwon')
+print()
+
+print()
+print(f'- Batch size: {args.batch_size}')
+print(f'- Episode: {args.ep}')
+print(f'- Exploration ratio: {args.exp}')
+print(f'- Timesteps: {args.timestep}')
+print(f'- Seed: {args.seed}')
+print(f'- Learning rate: {args.lr}')
+print(f'- Frequence of update - policy: {args.update_freq}')
+print(f'- Frequence of update - target: {args.update_freq_target}')
+print(f'- Using DDQN: {args.DDQN}')
+print()
+
+seed = args.seed
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
 torch.backends.cudnn.deterministic = True
-os.environ["PYTHONHASHSEED"] = str(seed)
+os.environ["PYTHONHASHSEED"] = str(args.seed)
 
 # GPU를 사용할 경우
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = "cpu"
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
-
 
 class ReplayMemory(object):
 
@@ -95,41 +161,39 @@ class DQN(nn.Module):
         return self.linear3(x)
 
 
-BATCH_SIZE = 64
-NUM_EPISODES = 400000
-STEPS = 20
-DISCOUNT_FACTOR = 0.9
+BATCH_SIZE = args.batch_size
+NUM_EPISODES = args.ep
+STEPS = args.timestep
+DISCOUNT_FACTOR = 0.8
 EPS_START = 0.99
 EPS_END = 0.01
-EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
-TARGET_UPDATE = 10
-UPDATE_FREQ = 1
-BUFFER = 100000
-LEARNING_RATE = 1e-4
-IS_DOUBLE_Q = True
+EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * args.exp)
+TARGET_UPDATE = args.update_freq_target
+UPDATE_FREQ = args.update_freq
+BUFFER = 10000
+LEARNING_RATE = args.lr
+IS_DOUBLE_Q = args.DDQN
 ZERO = False
 SCHEDULER = False
 SCHEDULER_GAMMA = 0.95
 
+
 now = time.localtime()
-str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_1th_{12}-{13}-{14}-{15}'.format(
+str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
     NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
-    BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, now.tm_hour, now.tm_min, now.tm_sec)
+    BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec)
 path = os.path.join(os.getcwd(), 'results')
 
 n_actions = env.action_space.n
 
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
+optimal_net = DQN().to(device)
 tmp_net = DQN().to(device)
 
 target_net.eval()
 optimizer = optim.Adam(policy_net.parameters(), lr=LEARNING_RATE)
 memory = ReplayMemory(BUFFER)
-'''if SCHEDULER:
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=SCHEDULER_GAMMA)'''
-'''earlystop = EarlyStopping(monitor='val_loss', patience=5, verbose=True, mode='min')
-trainer = Trainer(callbacks=[earlystop])'''
 
 epslions = []
 steps_done = 0
@@ -177,59 +241,53 @@ scheduler_check = False'''
 def optimize_model():
     if len(memory) < BATCH_SIZE:
         return
-
-    #initialize
-    next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    index = torch.zeros(BATCH_SIZE, device=device
-                        )
-
-
-    # batch-array의 Transitions을 Transition의 batch-arrays로 전환
-    # Changing Format
-    # From [[S1, A1, R1, S'1], [S2, A2, R2, S'2], ..., [Sn, An, Rn, S'n]]
-    # To [S1, S2, ..., Sn], [A1, A2, ..., An], ..., [S'1, S'2, ...,S'n]
     transitions = memory.sample(BATCH_SIZE)
+    # batch-array의 Transitions을 Transition의 batch-arrays로 전환
     batch = Transition(*zip(*transitions))
 
-    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,batch.next_state)), device=device, dtype=torch.bool)
-
-    #next state
+    non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
+                                            batch.next_state)), device=device, dtype=torch.bool)
     for s in batch.next_state:
         if s is not None:
             non_final_next_states = torch.stack(tuple(torch.Tensor(s)))
-    non_final_next_states= torch.cat([s for s in batch.next_state
-                                              if s is not None]).reshape(BATCH_SIZE, 1, 16)
-    #state, action, reward
+
+    '''propagation의 예측값 저장'''
     state_batch = torch.stack(batch.state)
     action_batch = torch.stack(batch.action)
     reward_batch = torch.stack(batch.reward)
 
-    # Q(s_t, a) 계산
-    #state_action_values = policy_net(state_batch).gather(-1, action_batch.squeeze(1))
-    state_action_values = policy_net(state_batch).reshape(BATCH_SIZE, 81, 1).gather(1, action_batch)
+    # Q(s_t, a) 계산 - 모델이 Q(s_t)를 계산하고, 취한 행동의 열을 선택
+    # policy_net에 따라 각 배치 상태에 대해 선택된 행동
+    state_action_values = policy_net(state_batch).gather(-1, action_batch.squeeze(1))
 
-    #print(state_action_values.size())
+    # 모든 다음 상태를 위한 V(s_{t+1}) 계산
+    # non_final_next_states의 행동들에 대한 기대값은 "이전" target_net을 기반으로 계산됩니다.
+    # max(1)[0]으로 최고의 보상을 선택
+    # 이것은 마스크를 기반으로 병합되어 기대 상태 값을 갖거나 상태가 최종인 경우 0을 갖습니다.
+    next_state_values = torch.zeros(BATCH_SIZE, device=device)
+    index = torch.zeros(BATCH_SIZE, device=device)
     if IS_DOUBLE_Q:
         index = policy_net(non_final_next_states).max(-1)[1].detach()
-        next_state_values = target_net(non_final_next_states)[-1][0][index].detach()
+        next_state_values = target_net(non_final_next_states)[index]
     else:
-        next_state_values = target_net(non_final_next_states).max(-1)[0].detach()
+        next_state_values[non_final_mask] = target_net(non_final_next_states).max(-1)[0].detach()
     # 기대 Q 값 계산
     expected_state_action_values = (next_state_values * DISCOUNT_FACTOR) + reward_batch
-    #print('e',expected_state_action_values.unsqueeze(1).size())
+
     # Huber 손실 계산
     '''loss 계산'''
     criterion = nn.SmoothL1Loss()
-    #    loss = criterion(state_action_values, expected_state_action_values)
-    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+    loss = criterion(state_action_values, expected_state_action_values.reshape(BATCH_SIZE, 1))
+    losses.append(loss.item())
 
     # 모델 최적화
     optimizer.zero_grad()
     '''backward propagation'''
     loss.backward()
+    for param in policy_net.parameters():
+        param.grad.data.clamp_(-1, 1)
     optimizer.step() #경사하강법(gradient descent). 옵티마이저는 .grad 에 저장된 변화도(gradients)에 따라 각 매개변수를 조정(adjust)합니다.
-    losses.append(loss.item())
-'''if scheduler_check: #scheduler 실행, 값 그래프 뽑기
+    '''if scheduler_check: #scheduler 실행, 값 그래프 뽑기
         scheduler.step()
         scheduler_lrs.append(scheduler.get_lr())
     else:
@@ -274,6 +332,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         scheduler_check = True
     for t in range(0, STEPS, 1):
         move_count += 1
+        throughput_value = 0
 
         # 행동 선택과 수행
         action = select_action(state)
@@ -290,20 +349,19 @@ for i_episode in tqdm(range(NUM_EPISODES)):
             if np.array_equal(next_state_reshape, state_reshape):
                 stay += 1'''
 
-        if last_set[0] != 0:
-            print(state_reshape[0], next_state_reshape[0],
-                  "action:%2d%2d%2d%2d reward:%.6f count:%2d"
-                  % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
+        # if reward > 13:
+        #     print(state_reshape[0], next_state_reshape[0],
+        #           "action:%2d%2d%2d%2d reward:%.6f count:%2d"
+        #           % (last_set[5], last_set[6], last_set[7], last_set[8], reward, move_count))
 
         if i_episode >= (NUM_EPISODES - 2):
             print(state_reshape[0], next_state_reshape[0],
-                  "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f txr:%3d"#dispersed:%6.3f move:%6.3f
+                  "action:%2d%2d%2d%2d throughput:%6.3f foot:%6.3f dispersed:%6.3f move:%6.3f txr:%3d"
                   % (last_set[5], last_set[6], last_set[7], last_set[8],
-                     last_set[0], last_set[1], last_set[4]))#last_set[2], last_set[3],
+                     last_set[0], last_set[1], last_set[2], last_set[3], last_set[4]))
 
         if last_set[0] != 0:
             throughput_count += 1
-        throughputs.append(last_set[0])
 
         '''throughputs.append(last_set[0])
         foots.append(last_set[1])
@@ -313,7 +371,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         rewards.append(reward)
         reward = torch.tensor([reward], device=device)
 
-        '''if (NUM_EPISODES / 2) < i_episode:
+        if (NUM_EPISODES / 2) < i_episode:
             z_txr_page = ((state[2].int().item() - 1) * 4 + state[3]).int().item()
             z_txr_reward[z_txr_page][state[0].int().item()][state[1].int().item()] += reward - (last_set[3]/22)
             z_txr_visit[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
@@ -321,7 +379,7 @@ for i_episode in tqdm(range(NUM_EPISODES)):
                     next_state_reshape[0][1] == 1 and \
                     next_state_reshape[0][2] == 1 and \
                     next_state_reshape[0][3] == 3:
-                z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += 1'''
+                z_txr_optimal[z_txr_page][state[0].int().item()][state[1].int().item()] += 1
         # 3D plot
         '''if i_episode == (num_episodes - 1):
             scatters_tail.append(np.array(next_state_reshape[0]))
@@ -338,13 +396,13 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         # 다음 상태로 이동
         state = next_state
 
-    # (정책 네트워크에서) 최적화 한단계 수행
-    if i_episode % UPDATE_FREQ == 0 and i_episode != NUM_EPISODES-1:
-        optimize_model()
-        if done:
-            # episode_durations.append(t + 1)
-            # plot_durations()
-             break
+        # (정책 네트워크에서) 최적화 한단계 수행
+        if i_episode % UPDATE_FREQ == 0:
+            optimize_model()
+            if done:
+                # episode_durations.append(t + 1)
+                # plot_durations()
+                break
 
     f1 = open(path + '/' + str, 'w')
 
@@ -377,33 +435,35 @@ for i_episode in tqdm(range(NUM_EPISODES)):
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:
         target_net.load_state_dict(policy_net.state_dict())
-
-    #stay_count.append(stay)
+    if stay == 15:
+        optimal_net.load_state_dict(policy_net.state_dict())
+    stay_count.append(stay)
     throughput_counts.append(throughput_count)
 
-    # z축기준 평면위치에 따른 throughput count 평균
-    '''if (NUM_EPISODES / 2 < i_episode):
-        z_throughput[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += throughput_count
-        z_throughput_count[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += 1
-print(z_throughput_count)
-for i in range(4):
-    for j in range(5):
-        for k in range(5):
-            if z_throughput_count[i][j][k] != 0:
-                z_throughput[i][j][k] /= z_throughput_count[i][j][k]
 # 학습후 state에 대한 th연결횟수/state 방문횟수
 for i in range(16):
     for j in range(5):
         for k in range(5):
             if z_txr_visit[i][j][k] != 0:
                     z_txr_optimal[i][j][k] /= z_txr_visit[i][j][k]
-                    z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]'''
-                    
+                    z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]
 
+    # z축기준 평면위치에 따른 throughput count 평균
+    '''if (NUM_EPISODES / 2 < i_episode):
+        z_throughput[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += throughput_count
+        z_throughput_count[state_for_save[2].int().item() - 1][state_for_save[0].int().item()][state_for_save[1].int().item()] += 1
+
+print(z_throughput_count)
+for i in range(4):
+    for j in range(5):
+        for k in range(5):
+            if z_throughput_count[i][j][k] != 0:
+                z_throughput[i][j][k] /= z_throughput_count[i][j][k]'''
 
 torch.save({
     'target_net': target_net.state_dict(),
     'policy_net': policy_net.state_dict(),
+    'optimal_net': optimal_net.state_dict(),
     'optimizer': optimizer.state_dict()
 }, path + '/' + str)
 
@@ -424,22 +484,21 @@ for i in range(4):
     dis = pd.DataFrame(data=distribution[i])
     plt.figure()
     ax = sns.heatmap(dis, annot=True)
-    plt.title('dis = {0}'.format(i))
+    plt.title('dis = {0}'.format(i))'''
 for i in range(16):
     # opt = pd.DataFrame(data=z_txr_optimal[i])
     # visit = pd.DataFrame(data=z_txr_visit[i])
     reward = pd.DataFrame(data=z_txr_reward[i])
-    #plt.figure()
-    #ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
-    #plt.title('optimal : z = {0}, txr = {1}'.format(i//4+1, i%4))
-    #plt.figure()
-    #ax = sns.heatmap(visit, cmap='YlGnBu', annot=True)
-    #plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))
+    '''plt.figure()
+    ax = sns.heatmap(opt, cmap='YlGnBu', annot=True)
+    plt.title('optimal : z = {0}, txr = {1}'.format(i//4+1, i%4))
+    plt.figure()
+    ax = sns.heatmap(visit, cmap='YlGnBu', annot=True)
+    plt.title('total visit : z = {0}, txr = {1}'.format(i//4+1, i%4))'''
     plt.figure()
     ax = sns.heatmap(reward, cmap='YlGnBu', annot=True)
     plt.title('reward : z = {0}, txr = {1}'.format(i//4+1, i % 4))
-plt.show()'''
-
+plt.show()
 
 def get_mean(array, k):
     means = []
@@ -452,6 +511,9 @@ def get_mean(array, k):
             sum += array[(n * k) + i]
         means.append(sum / k)
     return means
+
+
+'''
 
 
 def make_list(episode, term):
@@ -468,32 +530,31 @@ def make_list(episode, term):
 
 plt.figure()
 d = {'episode': range(NUM_EPISODES),
-     '1 episode': make_list(NUM_EPISODES, 1),
+     '1000 episode': make_list(NUM_EPISODES, 1000),
      'throughput count': throughput_counts}
 df = pd.DataFrame(data=d)
-th_count = sns.lineplot(data=df, x='1 episode', y='throughput count',ci='sd')
+th_count = sns.lineplot(data=df, x='1000 episode', y='throughput count',ci='sd')
 th_count.set(title='throughput count (0~20)')
 
 plt.figure()
 throughput_means2 = get_mean(throughputs, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     '1 episode': make_list(NUM_EPISODES, 1),
+     '1000 episode': make_list(NUM_EPISODES, 1000),
      'throughput': throughput_means2}
-print(len(range(NUM_EPISODES)), len(make_list(NUM_EPISODES, STEPS)), len(throughputs))
 df = pd.DataFrame(data=d)
-th = sns.lineplot(data=df, x='1 episode', y='throughput',ci='sd')
+th = sns.lineplot(data=df, x='1000 episode', y='throughput',ci='sd')
 th.set(title='throughput(0/6.333)')
 
 plt.figure()
 reward_means2 = get_mean(rewards, STEPS)
 d = {'episode': range(NUM_EPISODES),
-     '1 episode': make_list(NUM_EPISODES, 1),
+     '1000 episode': make_list(NUM_EPISODES, 1000),
      'reward': reward_means2}
 df = pd.DataFrame(data=d)
-reward = sns.lineplot(data=df, x='1 episode', y='reward',ci='sd')
+reward = sns.lineplot(data=df, x='1000 episode', y='reward',ci='sd')
 reward.set(title='reward')
 
-'''plt.figure()
+plt.figure()
 plt.title('stay count(0~20)')
 plt.xlabel('episode')
 plt.ylabel('count')
@@ -504,7 +565,7 @@ plt.figure()
 plt.title('throughput count')
 plt.xlabel('1000 episode')
 plt.ylabel('throughput count mean(0~20)')
-plt.plot(throughput_count_means1000)
+plt.plot(throughput_count)
 
 reward_means = get_mean(rewards, STEPS)
 
@@ -513,13 +574,13 @@ plt.figure()
 plt.title('reward mean 1000')
 plt.xlabel('1000 episodes')
 plt.ylabel('Reward')
-plt.plot(reward_means1000)'''
+plt.plot(reward_means1000)
 
 plt.figure()
 plt.title('eps')
 plt.xlabel('step')
 plt.ylabel('epsilon')
-plt.plot(epslions)
+plt.plot(epslions)'''
 
 plt.figure()
 plt.title('loss')
@@ -543,12 +604,13 @@ y_values = [y for y in throughputs]
 plt.scatter(x_values, y_values, s=40)"""
 
 
-
-'''plt.figure()
+reward_means = get_mean(rewards, STEPS)
+plt.figure()
 plt.title('reward mean')
 plt.xlabel('episode')
 plt.ylabel('Reward')
-plt.plot(reward_means)'''
+plt.plot(reward_means)
+
 
 '''reward_means50 = get_mean(reward_means, 50)
 plt.figure()
@@ -611,21 +673,45 @@ ax.scatter(np.transpose(scatters_tail)[0], np.transpose(scatters_tail)[1], np.tr
 ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 plt.show()'''
 
-print('seed  ', seed)
-print('BUFFER  ', BUFFER)
-print('ZERO  ', ZERO)
-print('IS_DOUBLE  ', IS_DOUBLE_Q)
-print('SCHEDULER  ', SCHEDULER)
-print('STEPS  ', STEPS)
-print('EPISODES  ', NUM_EPISODES)
-print('EPS_DECAY  ',EPS_DECAY)
-print('UPDATE_FREQ  ', UPDATE_FREQ)
-print('TARGET_UPDATE  ', TARGET_UPDATE)
-print('DISCOUNT_FACTOR  ', DISCOUNT_FACTOR)
-print('LEARNING_RATE  ', LEARNING_RATE)
-print('source txr = 1, MIN_HEIGHT = 0')
+print()
+print(' ################       ###                ###      #################   ')
+print(' ###           ###       ###              ###       ###     ')
+print(' ###             ###       ###          ###         ###     ')
+print(' ###           ###           ###      ###           ###     ')
+print(' ###############               ###  ###             #################     ')
+print(' ###           ###               ###                ###     ')
+print(' ###             ###             ###                ###     ')
+print(' ###           ###               ###                ###     ')
+print(' ###############                 ###                #################    ')
+print()
 
+print()
+print('DQN-based Formulating FANET')
+print()
+print('- Laboratory:')
+print('Brain and Machine Intelligence Lab')
+print('School of Electrical Engineering')
+print('Soongsil Univ.')
+print('Republic of Korea')
+print('https://brainmil.wordpress.com')
+print()
+print('- Developer:')
+print(' Haein Seo')
+print('- Professor:')
+print(' Minhae Kwon')
+print()
 
+print()
+print(f'- Batch size: {args.batch_size}')
+print(f'- Episode: {args.ep}')
+print(f'- Exploration ratio: {args.exp}')
+print(f'- Timesteps: {args.timestep}')
+print(f'- Seed: {args.seed}')
+print(f'- Learning rate: {args.lr}')
+print(f'- Frequence of update - policy: {args.update_freq}')
+print(f'- Frequence of update - target: {args.update_freq_target}')
+print(f'- Using DDQN: {args.DDQN}')
+print()
 
 env.close()
 plt.ioff()
