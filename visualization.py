@@ -48,7 +48,7 @@ class DQN(nn.Module):
 path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load(path+'/600000_20_0.9_1.0208333333333333e-07_10_1_1th_300000_0.0001_1_True_False_1th_False-16-37-36')['policy_net'])
+policy_net.load_state_dict(torch.load(path+'/400000_20_0.9_1.75e-07_10_1_1th_100000_0.0001_1_True_False_1th_False-15-45-17')['policy_net'])
 policy_net.eval()
 
 select_env = "dqn-v0"
@@ -70,7 +70,7 @@ scatter2 = []
 scatter3 = []
 scatter4 = []
 
-iter_num = 10
+iter_num = 100
 throughputs = np.zeros((iter_num,10))
 rewards = np.zeros((iter_num,10))
 for i in range(iter_num):
@@ -79,6 +79,7 @@ for i in range(iter_num):
     #state = torch.Tensor([2., 0., 4., 0., 2., 3., 3., 3., 0., 0., 0., 2., 4., 4., 4., 0.])
     max_count = 0
     stay = 0
+    print('============start:', state[4],state[5],state[6],state[7])
     for t in range(0, 10, 1):
         # 행동 선택과 수행
         throughput_count = 0
@@ -94,7 +95,7 @@ for i in range(iter_num):
                 stay += 1
         rewards[i][t] = reward
         reward = torch.tensor([reward], device=device)
-        print('State:{}, Reward:{}, throughput:{}, e_txr:{}'.format(state_reshape[0], reward.item(), last_set[0], last_set[4]))
+        print('State:{}, action:{}=({},{},{},{}), Reward:{}, throughput:{}, e_txr:{}'.format(state_reshape[0],action, last_set[5], last_set[6], last_set[7], last_set[8],reward.item(), last_set[0], last_set[4]))
         # To plot the trajectory, Storing the state information
         trajectory.append(np.array(state_reshape[0]))
         next_state = torch.Tensor(next_state)
@@ -105,8 +106,9 @@ for i in range(iter_num):
         if done:
             break
         # To plot the throughputs, Store the througput information
-        if last_set[0] != 0:
+        if last_set[0]:
             throughput_count += 1
+            max_count += 1
         throughputs[i][t] = throughput_count
         '''if i == 0:
             scatter0.append(np.array(state_reshape[0]))
@@ -118,8 +120,7 @@ for i in range(iter_num):
             scatter3.append(np.array(state_reshape[0]))
         elif i == 4:
             scatter4.append(np.array(state_reshape[0]))'''
-
-    print(throughput_count)
+    print(max_count)
     '''fig, ax1 = plt.subplots()
         color_1 = 'tab:blue'
         ax1.set_title('reward', fontsize=16)
@@ -170,7 +171,7 @@ d = {'step': make_list(len(rewards), iter_num),
 df = pd.DataFrame(data=d)
 fig, axe1 = plt.subplots()
 axe2 = axe1.twinx()
-through = sns.lineplot(ax=axe1, data=df, x='step', y='throughput', color='red')
+through = sns.lineplot(ax=axe1, data=df, x='step', y='throughput', color='magenta')
 reward = sns.lineplot(ax=axe2, data=df, x='step', y='reward', color='blue')
 axe1.legend(['throughput','reward'])
 
@@ -183,32 +184,32 @@ axe2.set_ylabel('reward',fontsize=14)
 
 
 # 3D 그래프 그리기
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-plt.title('position')
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-ax.set_xlim3d(0, env.MAX_LOC)
-ax.set_ylim3d(env.MAX_LOC, 0)
-ax.set_zlim3d(0, env.MAX_LOC)
-color_list = ("olive", "orange", "green", "blue", "purple", "black", "cyan", "pink", "brown", "darkslategray")
-
-nodes = []
-nodes.append(env.source)
-nodes.append(env.dest)
-nodes.append(env.agent2)
-ax.scatter(np.transpose(scatter0)[0], np.transpose(scatter0)[1], np.transpose(scatter0)[2],
-           marker='o', s=60, c='green')
-ax.scatter(np.transpose(scatter1)[0], np.transpose(scatter1)[1], np.transpose(scatter1)[2],
-           marker='o', s=60, c='red')
-ax.scatter(np.transpose(scatter2)[0], np.transpose(scatter2)[1], np.transpose(scatter2)[2], marker='o',
-           s=60, c='orange')
-ax.scatter(np.transpose(scatter3)[0], np.transpose(scatter2)[1], np.transpose(scatter2)[2], marker='o',
-           s=60, c='purple')
-ax.scatter(np.transpose(scatter4)[0], np.transpose(scatter2)[1], np.transpose(scatter2)[2], marker='o',
-           s=60, c='blue')
-ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# plt.title('position')
+# ax.set_xlabel('X')
+# ax.set_ylabel('Y')
+# ax.set_zlabel('Z')
+# ax.set_xlim3d(0, env.MAX_LOC)
+# ax.set_ylim3d(env.MAX_LOC, 0)
+# ax.set_zlim3d(0, env.MAX_LOC)
+# color_list = ("olive", "orange", "green", "blue", "purple", "black", "cyan", "pink", "brown", "darkslategray")
+#
+# nodes = []
+# nodes.append(env.source)
+# nodes.append(env.dest)
+# nodes.append(env.agent2)
+# ax.scatter(np.transpose(scatter0)[0], np.transpose(scatter0)[1], np.transpose(scatter0)[2],
+#            marker='o', s=60, c='green')
+# ax.scatter(np.transpose(scatter1)[0], np.transpose(scatter1)[1], np.transpose(scatter1)[2],
+#            marker='o', s=60, c='red')
+# ax.scatter(np.transpose(scatter2)[0], np.transpose(scatter2)[1], np.transpose(scatter2)[2], marker='o',
+#            s=60, c='orange')
+# ax.scatter(np.transpose(scatter3)[0], np.transpose(scatter2)[1], np.transpose(scatter2)[2], marker='o',
+#            s=60, c='purple')
+# ax.scatter(np.transpose(scatter4)[0], np.transpose(scatter2)[1], np.transpose(scatter2)[2], marker='o',
+#            s=60, c='blue')
+# ax.scatter(np.transpose(nodes)[0], np.transpose(nodes)[1], np.transpose(nodes)[2], marker='o', s=80, c='cyan')
 
 plt.ioff()
 plt.show()
