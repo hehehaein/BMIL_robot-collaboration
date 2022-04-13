@@ -98,13 +98,13 @@ class DQN(nn.Module):
 BATCH_SIZE = 64
 NUM_EPISODES = 400000
 STEPS = 20
+BUFFER = 100000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.01
-EPS_DECAY = (EPS_START - EPS_END) / (NUM_EPISODES * STEPS * 0.5)
+EPS_DECAY = (EPS_START - EPS_END) / ((NUM_EPISODES) * STEPS * 0.7)
 TARGET_UPDATE = 10
 UPDATE_FREQ = 1
-BUFFER = 100000
 LEARNING_RATE = 1e-4
 IS_DOUBLE_Q = True
 ZERO = False
@@ -180,8 +180,7 @@ def optimize_model():
 
     #initialize
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    index = torch.zeros(BATCH_SIZE, device=device
-                        )
+    index = torch.zeros(BATCH_SIZE, device=device)
 
 
     # batch-array의 Transitions을 Transition의 batch-arrays로 전환
@@ -398,7 +397,7 @@ for i in range(16):
             if z_txr_visit[i][j][k] != 0:
                     z_txr_optimal[i][j][k] /= z_txr_visit[i][j][k]
                     z_txr_reward[i][j][k] /= z_txr_visit[i][j][k]'''
-                    
+
 
 
 torch.save({

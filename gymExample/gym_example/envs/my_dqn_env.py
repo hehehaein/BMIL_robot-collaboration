@@ -94,6 +94,10 @@ class reward_set:
     def cal_foot(self, next_state_array, source, destination, i):
         foot = next_state_array[i][3] \
                - self.cal_h(next_state_array[i][0], next_state_array[i][1], next_state_array[i][2], source, destination)
+        # if next_state_array[i][0] == source[0] and next_state_array[i][1] == source[1] and next_state_array[i][2] == source[2]:
+        #     foot = 0
+        # if next_state_array[i][0] == destination[0] and next_state_array[i][1] == destination[1] and next_state_array[i][2] == destination[2]:
+        #     foot = 0
         return foot
 
     def cal_dispersed(self, i, my_txr, adj_array):
@@ -169,9 +173,9 @@ class My_DQN(gym.Env):
         relay_node.append(z)
         relay_node.append(r)
 
-        # index = np.random.randint(0,6)
-        # assistant_node = self.agent2[index]
-        assistant_node = self.agent2
+        index = np.random.randint(0,6)
+        assistant_node = self.agent2[index]
+        #assistant_node = self.agent2
 
         state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):
