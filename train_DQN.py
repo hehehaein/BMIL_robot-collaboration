@@ -96,13 +96,14 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 800000
+NUM_EPISODES = 320000
 STEPS = 20
 BUFFER = 100000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.01
-EPS_DECAY = (EPS_START - EPS_END) / ((NUM_EPISODES) * STEPS * 0.7)
+DECAY_SIZE = 1
+EPS_DECAY = (EPS_START - EPS_END) / ((NUM_EPISODES-120000) * STEPS)
 TARGET_UPDATE = 10
 UPDATE_FREQ = 1
 LEARNING_RATE = 1e-4
@@ -112,10 +113,12 @@ SCHEDULER = False
 SCHEDULER_GAMMA = 0.95
 
 now = time.localtime()
-str = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_1th_{12}-{13}-{14}-{15}'.format(
-    NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
+file_name_end = '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_1th_{12}-{13}-{14}-{15}-{16}'.format(
+    NUM_EPISODES, STEPS, DISCOUNT_FACTOR, DECAY_SIZE, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
     BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, now.tm_hour, now.tm_min, now.tm_sec)
-path = os.path.join(os.getcwd(), 'results')
+path_end = os.path.join(os.getcwd(), 'results')
+path_check = os.path.join(os.getcwd(), 'checking')
+checking = 0
 
 n_actions = env.action_space.n
 
@@ -344,10 +347,18 @@ for i_episode in tqdm(range(NUM_EPISODES)):
             # episode_durations.append(t + 1)
             # plot_durations()
              break
-
-    f1 = open(path + '/' + str, 'w')
+    if EPS_END >= EPS_START - (EPS_DECAY * (steps_done - 1)):
+        checking += 1
+        if ((i_episode % 1000) == 0 or (checking == 1)):
+            file_name_check = '{17}__{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_1th_{12}-{13}-{14}-{15}-{16}'.format(
+                NUM_EPISODES, STEPS, DISCOUNT_FACTOR, DECAY_SIZE, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
+                BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, now.tm_hour, now.tm_min, now.tm_sec, i_episode)
+            torch.save({
+                'net{}'.format(i_episode): policy_net.state_dict()
+            }, path_check + '/' + file_name_check)
 
     # 데이터 저장
+    # f1 = open(path_end + '/' + file_name_end, 'w')
     '''f2 = open(path + '/' + '{0}_{1}_{2}_{3}_{4}_{5}_{6}_{7}_{8}_{9}_{10}_{11}_{12}_{13}-{14}-{15}-{16}'.format(
         NUM_EPISODES, STEPS, DISCOUNT_FACTOR, EPS_DECAY, TARGET_UPDATE, UPDATE_FREQ, '1th',
         BUFFER, LEARNING_RATE, seed, IS_DOUBLE_Q, ZERO, SCHEDULER, SCHEDULER_GAMMA, now.tm_hour, now.tm_min, now.tm_sec), 'w')
@@ -404,7 +415,7 @@ torch.save({
     'target_net': target_net.state_dict(),
     'policy_net': policy_net.state_dict(),
     'optimizer': optimizer.state_dict()
-}, path + '/' + str)
+}, path_end + '/' + file_name_end)
 
 print('Complete')
 
@@ -617,6 +628,7 @@ print('IS_DOUBLE  ', IS_DOUBLE_Q)
 print('SCHEDULER  ', SCHEDULER)
 print('STEPS  ', STEPS)
 print('EPISODES  ', NUM_EPISODES)
+print('DECAY_SIZE  ',DECAY_SIZE)
 print('EPS_DECAY  ',EPS_DECAY)
 print('UPDATE_FREQ  ', UPDATE_FREQ)
 print('TARGET_UPDATE  ', TARGET_UPDATE)
