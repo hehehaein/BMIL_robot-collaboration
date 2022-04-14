@@ -71,16 +71,15 @@ scatter3 = []
 scatter4 = []
 
 iter_num = 100
-throughputs = np.zeros((iter_num,10))
-rewards = np.zeros((iter_num,10))
+throughputs = np.zeros((iter_num,20))
+rewards = np.zeros((iter_num,20))
 for i in range(iter_num):
     state = env.reset()
     state = torch.Tensor(state)
     #state = torch.Tensor([2., 0., 4., 0., 2., 3., 3., 3., 0., 0., 0., 2., 4., 4., 4., 0.])
     max_count = 0
     stay = 0
-    print('============start:', state[4],state[5],state[6],state[7])
-    for t in range(0, 10, 1):
+    for t in range(0, 20, 1):
         # 행동 선택과 수행
         throughput_count = 0
         action = select_action(state)
