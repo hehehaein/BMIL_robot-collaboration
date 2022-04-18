@@ -96,14 +96,14 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 320000
+NUM_EPISODES = 200000
 STEPS = 20
 BUFFER = 100000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.01
-DECAY_SIZE = 1
-EPS_DECAY = (EPS_START - EPS_END) / ((NUM_EPISODES-120000) * STEPS)
+DECAY_SIZE = 0.5
+EPS_DECAY = (EPS_START - EPS_END) / ((NUM_EPISODES) * STEPS * DECAY_SIZE)
 TARGET_UPDATE = 10
 UPDATE_FREQ = 1
 LEARNING_RATE = 1e-4
@@ -492,6 +492,27 @@ df = pd.DataFrame(data=d)
 reward = sns.lineplot(data=df, x='1 episode', y='reward',ci='sd')
 reward.set(title='reward')
 
+#리워드, hit ratio 같이 뽑기
+plt.figure()
+sns.set_style('darkgrid')
+#throughput -> hit ratio 변환
+hit_ratio = []
+for i in range(len(throughput_means2)):
+    hit_ratio = throughput_means2[i] / 20
+d = {'100 episode': make_list(NUM_EPISODES,100),
+     'hit ratio': hit_ratio,
+     'reward': reward_means2}
+df = pd.DataFrame(data=d)
+fig, axe1 = plt.subplots()
+axe2 = axe1.twinx()
+reward = sns.lineplot(ax=axe2, data=df, x='100 episode', y='reward', color='blue')
+through = sns.lineplot(ax=axe1, data=df, x='100 episode', y='hit ratio', color='red')
+axe2.legend(['hit ratio','reward'])
+axe2.grid(axis='x')
+axe1.grid(axis='y')
+axe2.set_ylabel('reward', fontsize=14)
+axe1.set_ylabel('hit ratio', fontsize=14)
+
 '''plt.figure()
 plt.title('stay count(0~20)')
 plt.xlabel('episode')
@@ -540,8 +561,6 @@ plt.ylabel('throughput')
 x_values = list(range(throughputs.__len__()))
 y_values = [y for y in throughputs]
 plt.scatter(x_values, y_values, s=40)"""
-
-
 
 '''plt.figure()
 plt.title('reward mean')

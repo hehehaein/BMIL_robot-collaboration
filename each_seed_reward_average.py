@@ -34,6 +34,26 @@ with open("rewards_8.pickle","rb") as f:
     rewards.append(pickle.load(f))
 with open("rewards_9.pickle","rb") as f:
     rewards.append(pickle.load(f))
+#with open("rewards_40_0.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_1.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_2.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_3.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_4.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_5.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_6.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_7.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_8.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
+# with open("rewards_40_9.pickle","rb") as f:
+#     rewards.append(pickle.load(f))
 
 throughputs = []
 with open("throughputs_0.pickle","rb") as f:
@@ -56,6 +76,27 @@ with open("throughputs_8.pickle","rb") as f:
     throughputs.append(pickle.load(f))
 with open("throughputs_9.pickle","rb") as f:
     throughputs.append(pickle.load(f))
+
+# with open("throughputs_40_0.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_1.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_2.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_3.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_4.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_5.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_6.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_7.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_8.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
+# with open("throughputs_40_9.pickle","rb") as f:
+#     throughputs.append(pickle.load(f))
 
 def get_mean(array, k):
     means = []
@@ -122,31 +163,30 @@ throughput_means2 = np.transpose(throughput_means2)
 throughput_means2 = throughput_means2.flatten()
 throughput_means2_100 = np.transpose(throughput_means2_100)
 throughput_means2_100 = throughput_means2_100.flatten()
+
 #츌력
 plt.figure()
 d = {'1 episode': make_list(NUM_EPISODES*iter, iter),
      'reward': reward_means2,
      'hit ratio': throughput_means2}
 df = pd.DataFrame(data=d)
-fig, axe1 = plt.subplots()
-axe2 = axe1.twinx()
-hit_ratio = sns.lineplot(ax=axe1, data=df, x='1 episode', y='hit ratio', color='red')
-reward = sns.lineplot(ax=axe2, data=df, x='1 episode', y='reward', color='blue')
-axe1.legend(['hit ratio','reward'])
-axe1.set_ylabel('hit ratio',fontsize=14)
-axe2.set_ylabel('reward',fontsize=14)
-
 plt.figure()
-d = {'100 episode': make_list(NUM_EPISODES//100*iter, iter),
-     'reward': reward_means2_100,
-     'throughput': throughput_means2_100}
-df = pd.DataFrame(data=d)
-fig, axe1 = plt.subplots()
-axe2 = axe1.twinx()
-hit_ratio = sns.lineplot(ax=axe1, data=df, x='1 episode', y='hit ratio', color='red')
-reward = sns.lineplot(ax=axe2, data=df, x='1 episode', y='reward', color='blue')
-axe1.legend(['hit ratio','reward'])
-axe1.set_ylabel('hit ratio',fontsize=14)
-axe2.set_ylabel('reward',fontsize=14)
+reward = sns.lineplot(data=df, x='1 episode', y='reward',ci='sd')
+reward.set(title='reward')
+# plt.figure()
+# reward = sns.lineplot(data=df, x='1 episode', y='hit ratio',ci='sd')
+# reward.set(title='hit ratio')
+# plt.figure()
+# d = {'1 episode': make_list(NUM_EPISODES*iter, iter),
+#      'reward': reward_means2,
+#      'hit ratio': throughput_means2}
+# df = pd.DataFrame(data=d)
+# fig, axe1 = plt.subplots()
+# axe2 = axe1.twinx()
+# hit_ratio = sns.lineplot(ax=axe1, data=df, x='1 episode', y='hit ratio', color='red')
+# reward = sns.lineplot(ax=axe2, data=df, x='1 episode', y='reward', color='blue')
+# axe1.legend(['hit ratio','reward'])
+# axe1.set_ylabel('hit ratio',fontsize=14)
+# axe2.set_ylabel('reward',fontsize=14)
 
 plt.show()

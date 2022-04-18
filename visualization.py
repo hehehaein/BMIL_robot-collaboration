@@ -48,7 +48,7 @@ class DQN(nn.Module):
 path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load(path+'/400000_20_0.9_1.75e-07_10_1_1th_100000_0.0001_1_True_False_1th_False-15-45-17')['policy_net'])
+policy_net.load_state_dict(torch.load(path+'/ds200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4')['policy_net'])
 policy_net.eval()
 
 select_env = "dqn-v0"
@@ -71,15 +71,14 @@ scatter3 = []
 scatter4 = []
 
 iter_num = 100
-throughputs = np.zeros((iter_num,20))
-rewards = np.zeros((iter_num,20))
+throughputs = np.zeros((iter_num,10))
+rewards = np.zeros((iter_num,10))
 for i in range(iter_num):
     state = env.reset()
     state = torch.Tensor(state)
-    #state = torch.Tensor([2., 0., 4., 0., 2., 3., 3., 3., 0., 0., 0., 2., 4., 4., 4., 0.])
     max_count = 0
     stay = 0
-    for t in range(0, 20, 1):
+    for t in range(0, 10, 1):
         # 행동 선택과 수행
         throughput_count = 0
         action = select_action(state)
@@ -108,7 +107,7 @@ for i in range(iter_num):
         if last_set[0]:
             throughput_count += 1
             max_count += 1
-        throughputs[i][t] = throughput_count
+        throughputs[i][t] = last_set[0]
         '''if i == 0:
             scatter0.append(np.array(state_reshape[0]))
         elif i == 1:
@@ -164,19 +163,20 @@ plt.figure()
 sns.set_style('darkgrid')
 rewards = np.transpose(rewards).flatten()
 throughputs = np.transpose(throughputs).flatten()
-d = {'step': make_list(len(rewards), iter_num),
+d = {'timestep': make_list(len(rewards), iter_num),
      'throughput': throughputs,
      'reward': rewards}
 df = pd.DataFrame(data=d)
 fig, axe1 = plt.subplots()
 axe2 = axe1.twinx()
-through = sns.lineplot(ax=axe1, data=df, x='step', y='throughput', color='magenta')
-reward = sns.lineplot(ax=axe2, data=df, x='step', y='reward', color='blue')
-axe1.legend(['throughput','reward'])
+reward = sns.lineplot(ax=axe2, data=df, x='timestep', y='reward', color='blue')
+through = sns.lineplot(ax=axe1, data=df, x='timestep', y='throughput', color='magenta')
+axe2.legend(['throughput','reward'])
+axe2.grid(axis='x')
+axe1.grid(axis='y')
+axe2.set_ylabel('reward', fontsize=14)
+axe1.set_ylabel('throughput', fontsize=14)
 
-
-axe1.set_ylabel('throughput',fontsize=14)
-axe2.set_ylabel('reward',fontsize=14)
 
 
 

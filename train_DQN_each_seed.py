@@ -96,13 +96,13 @@ class DQN(nn.Module):
 
 
 BATCH_SIZE = 64
-NUM_EPISODES = 200000
+NUM_EPISODES = 400000
 STEPS = 20
 BUFFER = 100000
 DISCOUNT_FACTOR = 0.9
 EPS_START = 0.99
 EPS_END = 0.01
-DECAY_SIZE = 0.5
+DECAY_SIZE = 0.7
 EPS_DECAY = (EPS_START - EPS_END) / ((NUM_EPISODES) * STEPS * DECAY_SIZE)
 TARGET_UPDATE = 10
 UPDATE_FREQ = 1
@@ -409,9 +409,9 @@ torch.save({
 
 print('Complete')
 
-with open("rewards_9.pickle","wb") as f:
+with open("rewards_40_9.pickle","wb") as f:
     pickle.dump(rewards, f)
-with open("throughputs_9.pickle","wb") as f:
+with open("throughputs_40_9.pickle","wb") as f:
     pickle.dump(throughputs, f)
 
 # heatmap by plt.pcolor()

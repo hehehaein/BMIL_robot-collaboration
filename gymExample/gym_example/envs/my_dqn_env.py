@@ -11,7 +11,7 @@ import networkx as nx
 from matplotlib import pyplot as plt
 from ray.rllib.train import torch
 
-seed = 1
+seed = 0
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
@@ -140,7 +140,7 @@ class My_DQN(gym.Env):
     MIN_LOC = 0
     MAX_LOC = 4
 
-    MIN_HEIGHT = 0
+    MIN_HEIGHT = 1
     MAX_HEIGHT = 4
 
     source = np.array((MIN_LOC, MIN_LOC, MIN_LOC, 2))
@@ -174,8 +174,8 @@ class My_DQN(gym.Env):
         relay_node.append(r)
 
         index = np.random.randint(0,6)
-        assistant_node = self.agent2[index]
-        #assistant_node = self.agent2
+        #assistant_node = self.agent2[index]
+        assistant_node = self.agent2
 
         state_set = np.zeros((self.N + 2, 4), dtype=int)
         for i in range(4):
