@@ -8,6 +8,7 @@ import pandas as pd
 import time
 import os
 import seaborn as sns;
+import matplotlib.lines as mlines
 
 sns.set()
 import json
@@ -408,6 +409,14 @@ torch.save({
 
 print('Complete')
 
+#결과 그래프 그릴 데이터 저장
+with open("rewards_jcci_20.pickle","wb") as f:
+    pickle.dump(rewards, f)
+with open("throughputs_jcci_20.pickle","wb") as f:
+    pickle.dump(throughputs, f)
+with open("throughputs_count_jcci_20.pickle","wb") as f:
+    pickle.dump(throughput_counts, f)
+
 # heatmap by plt.pcolor()
 '''for i in range(4):
     df = pd.DataFrame(data=z_throughput[i])
@@ -478,7 +487,6 @@ throughput_means2 = get_mean(throughputs, STEPS)
 d = {'episode': range(NUM_EPISODES),
      '1 episode': make_list(NUM_EPISODES, 1),
      'throughput': throughput_means2}
-print(len(range(NUM_EPISODES)), len(make_list(NUM_EPISODES, STEPS)), len(throughputs))
 df = pd.DataFrame(data=d)
 th = sns.lineplot(data=df, x='1 episode', y='throughput',ci='sd')
 th.set(title='throughput(0/6.333)')
@@ -497,8 +505,9 @@ plt.figure()
 sns.set_style('darkgrid')
 #throughput -> hit ratio 변환
 hit_ratio = []
-for i in range(len(throughput_means2)):
-    hit_ratio = throughput_means2[i] / 20
+for i in range(len(throughput_counts)):
+    tmp = throughput_counts[i] / 20
+    hit_ratio.append(tmp)
 d = {'100 episode': make_list(NUM_EPISODES,100),
      'hit ratio': hit_ratio,
      'reward': reward_means2}
@@ -512,6 +521,13 @@ axe2.grid(axis='x')
 axe1.grid(axis='y')
 axe2.set_ylabel('reward', fontsize=14)
 axe1.set_ylabel('hit ratio', fontsize=14)
+
+# axe1.axhline(1.0,c='black', ls ='--')
+#
+# mark_reward = mlines.Line2D([], [], color='blue', linestyle ='-', label='reward')
+# mark_hit_ratio = mlines.Line2D([], [], color='red', linestyle ='-', label='hit ratio')
+#
+# plt.legend(handles=[mark_reward, mark_hit_ratio])
 
 '''plt.figure()
 plt.title('stay count(0~20)')
