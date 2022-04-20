@@ -1,4 +1,6 @@
 import copy
+import pickle
+
 import pandas as pd
 import gym
 import random
@@ -14,6 +16,7 @@ from collections import namedtuple, deque
 from itertools import count
 from ray.tune.registry import register_env
 from gymExample.gym_example.envs.my_dqn_env import My_DQN
+import matplotlib.lines as mlines
 
 import torch
 import torch.nn as nn
@@ -48,7 +51,8 @@ class DQN(nn.Module):
 path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load(path+'/ds200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4')['policy_net'])
+policy_net.load_state_dict(torch.load(path+'/400000_20_0.9_1.225e-07_10_1_1th_100000_0.0001_1_True_False_1th_False-17-53-1')['policy_net'])
+# ds200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4
 policy_net.eval()
 
 select_env = "dqn-v0"
@@ -159,6 +163,11 @@ def make_list(episode, term):
         n += 1
     return list
 
+with open("rewards_jcci_execute_20.pickle","wb") as f:
+    pickle.dump(rewards, f)
+with open("throughputs_jcci_execute_20.pickle","wb") as f:
+    pickle.dump(throughputs, f)
+
 plt.figure()
 sns.set_style('darkgrid')
 rewards = np.transpose(rewards).flatten()
@@ -177,7 +186,20 @@ axe1.grid(axis='y')
 axe2.set_ylabel('reward', fontsize=14)
 axe1.set_ylabel('throughput', fontsize=14)
 
+axe2.set_ylim(2, 12)
+axe1.set_ylim(-3, 7)
 
+axe2.axhline(11.667, c='black', ls ='--')
+axe1.axhline(6.667, c='black', ls ='--')
+
+mark_reward = mlines.Line2D([], [], color='blue', linestyle='-', label='reward')
+mark_throughput = mlines.Line2D([], [], color='magenta', linestyle='-', label='throughput')
+mark_upper_th = mlines.Line2D([], [], color='black', linestyle='--', label='upper bound')
+
+axe1.tick_params(axis='y')
+axe2.tick_params(axis='y')
+
+plt.legend(handles=[mark_reward, mark_throughput, mark_upper_th], loc='lower right')
 
 
 
