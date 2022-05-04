@@ -369,10 +369,10 @@ for i_episode in tqdm(range(NUM_EPISODES)):
         data.to_pickle(path+'/'+str+'epi{}'.format(i_episode)+'_data.pickle')'''
 
     # gradient 출력
-    if i_episode == NUM_EPISODES - 1:
-        for p in policy_net.parameters():
-            with torch.no_grad():
-                print(p.grad, len(p.grad), p.grad.shape)
+    # if i_episode == NUM_EPISODES - 1:
+    #     for p in policy_net.parameters():
+    #         with torch.no_grad():
+    #             print(p.grad, len(p.grad), p.grad.shape)
 
     # 목표 네트워크 업데이트, 모든 웨이트와 바이어스 복사
     if i_episode % TARGET_UPDATE == 0:

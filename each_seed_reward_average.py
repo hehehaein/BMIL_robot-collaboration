@@ -8,6 +8,8 @@ import time
 import os
 import seaborn as sns;
 import pickle
+import matplotlib.lines as mlines
+from statistics import NormalDist
 
 NUM_EPISODES = 200000
 STEPS = 20
@@ -34,6 +36,7 @@ with open("rewards_8.pickle","rb") as f:
     rewards.append(pickle.load(f))
 with open("rewards_9.pickle","rb") as f:
     rewards.append(pickle.load(f))
+
 #with open("rewards_40_0.pickle","rb") as f:
 #     rewards.append(pickle.load(f))
 # with open("rewards_40_1.pickle","rb") as f:
@@ -127,12 +130,14 @@ reward_means = np.reshape(rewards, (iter,NUM_EPISODES*STEPS))  #각 iter마다�
 #한 iter에서 하나의 episode의 평균으로 묶음
 reward_means2 = []
 for i in range(iter):
+    print('1:', max(reward_means[i]))
     tmp = get_mean(reward_means[i], STEPS)
     reward_means2.append(tmp)
 
 #한 iter에서 100개의 episode의 평균으로 묶음
 reward_means2_100 = []
 for i in range(iter):
+    print('100:',max(reward_means2[i]))
     tmp = get_mean(reward_means2[i], 100)
     reward_means2_100.append(tmp)
 #dataframe별로 표준편차 나타낼려고 배열 모양 변형
@@ -164,15 +169,29 @@ throughput_means2 = throughput_means2.flatten()
 throughput_means2_100 = np.transpose(throughput_means2_100)
 throughput_means2_100 = throughput_means2_100.flatten()
 
+print('max:',max(reward_means2))
+print('max_100:',max(reward_means2_100))
 #츌력
 plt.figure()
-d = {'1 episode': make_list(NUM_EPISODES*iter, iter),
-     'reward': reward_means2,
-     'hit ratio': throughput_means2}
+sns.set_style('darkgrid')
+d = {'100 episode': make_list(NUM_EPISODES/100*iter, iter),
+     'reward': reward_means2_100,
+     'hit ratio': throughput_means2_100}
 df = pd.DataFrame(data=d)
-plt.figure()
-reward = sns.lineplot(data=df, x='1 episode', y='reward',ci='sd')
+reward = sns.lineplot(data=df, x='100 episode', y='reward', color='blue', ci=68)
 reward.set(title='reward')
+plt.axhline(11.666666666666668, c='black', ls ='--')
+mark_reward = mlines.Line2D([], [], color='blue', linestyle='-', label='reward')
+mark_upper = mlines.Line2D([], [], color='black', linestyle='--', label='upper bound')
+
+plt.legend(handles=[mark_reward, mark_upper], loc='lower right')
+
+last = []
+for i in range(10):
+    last.append((reward_means[i][120000*STEPS-1]))
+print(last)
+print(np.std(last))
+print(np.mean(last))
 # plt.figure()
 # reward = sns.lineplot(data=df, x='1 episode', y='hit ratio',ci='sd')
 # reward.set(title='hit ratio')

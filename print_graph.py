@@ -58,7 +58,8 @@ for i in range(len(throughput)):
 
 reward_means = get_mean(reward, STEPS)
 throughput_means = get_mean(throughput, STEPS)
-
+print(reward_means[-1])
+print(throughput_means[-1])
 d = {'100 episode': make_list(NUM_EPISODES,100),
      'throughput': throughput_means,
      'reward': reward_means}
@@ -66,23 +67,24 @@ df = pd.DataFrame(data=d)
 fig, axe1 = plt.subplots()
 axe2 = axe1.twinx()
 
-hit = sns.lineplot(ax=axe1, data=df, x='100 episode', y='throughput', color='red')
+throughput = sns.lineplot(ax=axe1, data=df, x='100 episode', y='throughput', color='red')
 reward = sns.lineplot(ax=axe2, data=df, x='100 episode', y='reward', color='blue')
 
 mark_reward = mlines.Line2D([], [], color='blue', linestyle ='-', label='reward')
-mark_throughput = mlines.Line2D([], [], color='red', linestyle ='-', label='throughput')
+mark_throughput = mlines.Line2D([], [], color='red', linestyle ='-', label='throughput average')
 mark_upper = mlines.Line2D([],[], color='black', linestyle='--', label='upper bound')
 
 axe1.grid(axis='y')
 axe2.grid(axis='x')
 
 axe1.axhline(6.667, c='black', ls ='--')
+#axe2.axhline(11.667, c='black', ls ='--')
 
 axe1.tick_params(axis='y')
 axe2.tick_params(axis='y')
 
-# axe2.set_ylim(2, 12)
-# axe1.set_ylim(-3, 7)
+axe2.set_ylim(-2, 12)
+axe1.set_ylim(0, 7)
 
 plt.legend(handles=[mark_reward, mark_throughput,mark_upper], loc='lower right')
 

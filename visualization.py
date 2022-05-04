@@ -51,7 +51,7 @@ class DQN(nn.Module):
 path = os.path.join(os.getcwd(), 'results')
 policy_net = DQN().to(device)
 target_net = DQN().to(device)
-policy_net.load_state_dict(torch.load(path+'/400000_20_0.9_1.225e-07_10_1_1th_100000_0.0001_1_True_False_1th_False-17-53-1')['policy_net'])
+policy_net.load_state_dict(torch.load(path+'/ds200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4')['policy_net'])
 # ds200000_20_0.9_3.0625e-07_10_1_1th_100000_0.0001_1_True_False_False_0.95-19-8-4
 policy_net.eval()
 
@@ -172,14 +172,18 @@ plt.figure()
 sns.set_style('darkgrid')
 rewards = np.transpose(rewards).flatten()
 throughputs = np.transpose(throughputs).flatten()
+
+print(rewards[-1])
+print(throughputs[-1])
+
 d = {'timestep': make_list(len(rewards), iter_num),
      'throughput': throughputs,
      'reward': rewards}
 df = pd.DataFrame(data=d)
 fig, axe1 = plt.subplots()
 axe2 = axe1.twinx()
-reward = sns.lineplot(ax=axe2, data=df, x='timestep', y='reward', color='blue')
-through = sns.lineplot(ax=axe1, data=df, x='timestep', y='throughput', color='magenta')
+reward = sns.lineplot(ax=axe2, data=df, x='timestep', y='reward', color='blue', ci=68)
+through = sns.lineplot(ax=axe1, data=df, x='timestep', y='throughput', color='red', ci=68)
 axe2.legend(['throughput','reward'])
 axe2.grid(axis='x')
 axe1.grid(axis='y')
@@ -193,7 +197,7 @@ axe2.axhline(11.667, c='black', ls ='--')
 axe1.axhline(6.667, c='black', ls ='--')
 
 mark_reward = mlines.Line2D([], [], color='blue', linestyle='-', label='reward')
-mark_throughput = mlines.Line2D([], [], color='magenta', linestyle='-', label='throughput')
+mark_throughput = mlines.Line2D([], [], color='red', linestyle='-', label='throughput')
 mark_upper_th = mlines.Line2D([], [], color='black', linestyle='--', label='upper bound')
 
 axe1.tick_params(axis='y')
